@@ -1,8 +1,8 @@
-import contextlib
 import copy
-from itertools import chain
+import inspect
+from collections import OrderedDict
+
 from .fields import Field
-from collections import OrderedDict, Counter
 
 
 class StructMeta(type):
@@ -37,16 +37,41 @@ class StructMeta(type):
 
     @classmethod
     def __prepare__(mcs, name, bases):
+        # Attributes need to be iterated in order of definition
         return OrderedDict()
 
 
 class Struct(metaclass=StructMeta):
     @property
     def _fields(self):
+        # Use standard getattribute because custom returns the field values instead
         return (object.__getattribute__(self, name) for name in self._field_names)
 
-    def __init__(self):
+    # noinspection PyArgumentList
+    def __init__(self, *args):
         super().__init__()
+
+        # Create a list of all the positional (required) arguments
+        positional_args = []
+        # Is a subclass of Struct (and not Strut)
+        if type(self) is not Struct:
+            for name, param in inspect.signature(self.__init__).parameters.items():
+                if param.default == inspect.Parameter.empty and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                    positional_args.append(name)
+
+        if len(args) != len(positional_args):
+            raise ValueError('Invalid arguments were passed to the superclass. '
+                             'Expected arguments: {} but {} given.'
+                             .format(positional_args, len(args)))
+
+        # from_bytes needs the args and kwargs to create the class
+        # Set from_bytes as a private function
+        self._from_bytes = self.from_bytes
+
+        # Encapsulate _from_bytes so the arguments are automatically passed without changing from_bytes API
+        self.from_bytes = lambda data: self._from_bytes(data, *args)
+
+        # Deepcopy the fields so different instances of Struct have unique fields
         for name, field in zip(self._field_names, self._fields):
             setattr(self, name, copy.deepcopy(field))
 
@@ -66,25 +91,34 @@ class Struct(metaclass=StructMeta):
         return b''.join(map(bytes, self._fields))
 
     @classmethod
-    def from_bytes(cls, data: bytes):
-        obj = cls()
+    def from_bytes(cls, data: bytes, *args):
+        obj = cls(*args)
 
-        # noinspection PyProtectedMember
-        for field_name in obj._field_names:
-            field = getattr(obj, field_name)
+        for field in obj._fields:
             split_index = len(field)
             field_data, data = data[:split_index], data[split_index:]
-            setattr(obj, field_name, field.from_bytes(field_data).value)
+            field.value = field.from_bytes(field_data).value
 
         return obj
 
     def __getattribute__(self, item):
+        """
+        :param item:    The name of the item to get
+        :return:        item's value, unless it's a field. In which case, the field's value
+        """
         fields = super().__getattribute__('_field_names')
         if item in fields:
             return super().__getattribute__(item).value
         return super().__getattribute__(item)
 
     def __setattr__(self, key, value):
+        """
+        Has standard behavior, except when key references a field. In which case, set the field's value.
+
+        :param key:     The name of the attribute to set
+        :param value:   The value to set
+        :return:        None
+        """
         if key in self._field_names and not isinstance(value, Field):
             super().__getattribute__(key).value = value
         else:

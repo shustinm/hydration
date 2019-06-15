@@ -32,3 +32,22 @@ def test_redefining_fields(field):
 
 def test_bytes_length():
     assert len(bytes(Omri())) == 11
+
+
+def test_non_default_args():
+    class Check(h.Struct):
+        x = h.UInt8()
+
+        def __init__(self, a):
+            super().__init__(a)
+            assert a == 3
+
+    c = Check(3)
+    c.from_bytes(bytes(c))
+
+    class CheckBad(h.Struct):
+        def __init__(self, a):
+            super().__init__()
+
+    with pytest.raises(ValueError):
+        CheckBad(1)
