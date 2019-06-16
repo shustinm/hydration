@@ -1,6 +1,11 @@
 import enum
 import struct
+from typing import Union
+
 from .fields import Field
+
+
+scalar_values = Union[int, float]
 
 
 class Endianness(enum.Enum):
@@ -10,16 +15,8 @@ class Endianness(enum.Enum):
     BigEndian = '>'
 
 
-class _Scalar(Field):
-    @classmethod
-    def validate(cls, value):
-        try:
-            struct.pack(ScalarFormat(cls).name, value)
-        except struct.error:
-            return False
-        return True
-
-    def __init__(self, value, endianness: Endianness):
+class Scalar(Field):
+    def __init__(self, value: scalar_values, endianness: Endianness):
         super().__init__()
         self._value = value
         self.endianness_format = endianness.value if endianness else ''
@@ -36,8 +33,18 @@ class _Scalar(Field):
         else:
             raise ValueError('Value {} is invalid for field type {}'.format(value, self.__class__.__qualname__))
 
+    def validate(self, value):
+        try:
+            struct.pack(self.scalar_format, value)
+        except struct.error:
+            return False
+        return True
+
     def __repr__(self):
         return '{}({})'.format(self.__class__.__qualname__, self.value)
+
+    def __str__(self):
+        return repr(self)
 
     def __len__(self) -> int:
         return len(bytes(self))
@@ -55,17 +62,20 @@ class _Scalar(Field):
 
     def from_bytes(self, data: bytes):
         format_string = '{}{}'.format(self.endianness_format, ScalarFormat(self.__class__).name)
+        # noinspection PyAttributeOutsideInit
         self.value = struct.unpack(format_string, data)[0]
         return self
 
 
-class _IntScalar(_Scalar):
+class _IntScalar(Scalar):
     def __init__(self, value: int = 0, endianness: Endianness = None):
         super().__init__(value, endianness)
 
 
 class UInt8(_IntScalar):
-    pass
+    # Override constructor because this scalar doesn't have endianness
+    def __init__(self, value: int = 0):
+        super().__init__(value)
 
 
 class UInt16(_IntScalar):
@@ -81,7 +91,9 @@ class UInt64(_IntScalar):
 
 
 class Int8(_IntScalar):
-    pass
+    # Override constructor because this scalar doesn't have endianness
+    def __init__(self, value: int = 0):
+        super().__init__(value)
 
 
 class Int16(_IntScalar):
@@ -96,7 +108,7 @@ class Int64(_IntScalar):
     pass
 
 
-class _FloatScalar(_Scalar):
+class _FloatScalar(Scalar):
     def __init__(self, value: float = 0.0, endianness: Endianness = None):
         super().__init__(float(value), endianness)
 

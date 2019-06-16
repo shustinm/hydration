@@ -1,7 +1,7 @@
 import abc
 
 
-class Field(metaclass=abc.ABCMeta):
+class Field(abc.ABC):
 
     @property
     @abc.abstractmethod
@@ -15,6 +15,10 @@ class Field(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def __repr__(self) -> str:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def __str__(self) -> str:
         raise NotImplementedError
 
     @abc.abstractmethod
