@@ -1,6 +1,7 @@
 import copy
 import inspect
 from collections import OrderedDict
+from contextlib import suppress
 
 from .fields import Field
 
@@ -24,8 +25,15 @@ class StructMeta(type):
         attributes = base_fields
 
         # Create the list of the final fields and set the new attributes accordingly
+        attributes['_bases'] = list(base.__qualname__ for base in bases)
         field_list = []
         for k, v in attributes.items():
+            with suppress(AttributeError):
+                if 'Struct' in v._bases:
+                    # This field is a nested struct
+                    field_list.append(k)
+                    attributes[k] = v
+                    continue
             if isinstance(v, Field):
                 field_list.append(k)
                 attributes[k] = v
@@ -43,6 +51,18 @@ class StructMeta(type):
 
 class Struct(metaclass=StructMeta):
     @property
+    def value(self):
+        return self
+
+    @value.setter
+    def value(self, obj):
+        vars(self).update(vars(obj))
+
+    @classmethod
+    def validate(cls, value):
+        return type(value) == cls
+
+    @property
     def _fields(self):
         # Use standard getattribute because custom returns the field values instead
         return (object.__getattribute__(self, name) for name in self._field_names)
@@ -53,7 +73,7 @@ class Struct(metaclass=StructMeta):
 
         # Create a list of all the positional (required) arguments
         positional_args = []
-        # Is a subclass of Struct (and not Strut)
+        # if self is a subclass of Struct (and not Struct)
         if type(self) is not Struct:
             for name, param in inspect.signature(self.__init__).parameters.items():
                 if param.default == inspect.Parameter.empty and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
@@ -76,16 +96,28 @@ class Struct(metaclass=StructMeta):
             setattr(self, name, copy.deepcopy(field))
 
     def __str__(self):
-        return '{cls}:\n{data}'.format(cls=self.__class__.__qualname__,
-                                       data='\n'.join('\t{}:\t{}'.format(name, field) for name, field in
-                                                      zip(self._field_names, self._fields)))
+        x = [self.__class__.__qualname__]
+        for name, field in zip(self._field_names, self._fields):
+            if isinstance(field, Struct):
+                x.append('\t{} ({}):'.format(name, field.__class__.__qualname__))
+                x.extend('\t{}'.format(field_str) for field_str in str(field).splitlines()[1:])
+            else:
+                x.append('\t{}:\t{}'.format(name, field))
+        return '\n'.join(x)
 
     def __len__(self) -> int:
         return sum(map(len, self._fields))
 
     def __eq__(self, other) -> bool:
         # noinspection PyProtectedMember
-        return all(a == b for a, b in zip(self._fields, other._fields))
+        # return all(a == b for a, b in zip(self._fields, other._fields))
+        for a, b in zip(self._fields, other._fields):
+            if a != b:
+                return False
+        return True
+
+    def __ne__(self, other) -> bool:
+        return not self == other
 
     def __bytes__(self) -> bytes:
         return b''.join(map(bytes, self._fields))
@@ -119,7 +151,7 @@ class Struct(metaclass=StructMeta):
         :param value:   The value to set
         :return:        None
         """
-        if key in self._field_names and not isinstance(value, Field):
+        if key in self._field_names and not isinstance(value, (Field, StructMeta)):
             super().__getattribute__(key).value = value
         else:
             super().__setattr__(key, value)

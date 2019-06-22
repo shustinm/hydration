@@ -38,3 +38,9 @@ class Field(abc.ABC):
     @abc.abstractmethod
     def validate(cls, value):
         raise NotImplementedError
+
+    def __eq__(self, other):
+        return self.value == other.value
+
+    def __ne__(self, other):
+        return not self.value == other.value
