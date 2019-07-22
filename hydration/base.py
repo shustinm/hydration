@@ -11,17 +11,23 @@ class StructMeta(type):
 
         # Load all the fields from the parent classes
         base_fields = OrderedDict()
+        footer_fields = OrderedDict()
         for base in filter(lambda x: issubclass(x, Struct), bases):
             for field_name in base._field_names:
-                base_fields[field_name] = getattr(base, field_name)
+                try:
+                    if base._footer:
+                        footer_fields[field_name] = getattr(base, field_name)
+                except AttributeError:
+                    base_fields[field_name] = getattr(base, field_name)
 
         # Check to see if any of the current attributes have already been defined
         for k, v in attributes.items():
-            if k in base_fields:
+            if k in base_fields or k in footer_fields:
                 raise NameError("Field '{}' was defined more than once".format(k))
 
         # Update the current attributes with the fields from the parents (in order)
         base_fields.update(attributes)
+        base_fields.update(footer_fields)
         attributes = base_fields
 
         # Create the list of the final fields and set the new attributes accordingly
@@ -68,7 +74,7 @@ class Struct(metaclass=StructMeta):
         return (object.__getattribute__(self, name) for name in self._field_names)
 
     # noinspection PyArgumentList
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         super().__init__()
 
         # Create a list of all the positional (required) arguments

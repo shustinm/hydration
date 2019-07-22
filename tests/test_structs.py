@@ -44,3 +44,25 @@ def test_non_default_args():
 
     with pytest.raises(ValueError):
         CheckBad(1)
+
+
+class MyStructHeader(h.Struct):
+    a = h.UInt8(1)
+
+
+class MyStructFooter(h.Struct):
+    _footer = True
+    d = h.UInt8(4)
+
+
+class MyStructBody(h.Struct):
+    b = h.UInt8(2)
+    c = h.UInt8(3)
+
+
+class MyStruct(MyStructFooter, MyStructHeader, MyStructBody):
+    pass
+
+
+def test_footer():
+    assert bytes(MyStruct()) == b'\x01\x02\x03\x04'
