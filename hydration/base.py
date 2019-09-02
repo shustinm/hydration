@@ -46,11 +46,11 @@ class StructMeta(type):
                 if isinstance(v, VLA):
                     # Look for the name of the field which has the VLA's length
                     for attr_name, attr in attributes.items():
-                        if attr is di(v.length_field_obj_id):
+                        if attr is v.length_field_obj:
                             v.length_field_name = attr_name
                             break
                     else:
-                        raise RuntimeError('Unable to find id {} for VLA {}'.format(v.length_field_obj_id, v))
+                        raise RuntimeError('Unable to find id {} for VLA {}'.format(v.length_field_obj, v))
 
         # Also save as attribute so it can be used to iterate over the fields in order
         attributes['_field_names'] = field_list
@@ -178,7 +178,3 @@ class Struct(metaclass=StructMeta):
                 setattr(self, field.length_field_name, len(field))
         else:
             super().__setattr__(key, value)
-
-
-def di(obj_id: int):
-    return PyObj_FromPtr(obj_id)

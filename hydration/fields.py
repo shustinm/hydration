@@ -60,7 +60,7 @@ class VLA:
             self.length_field_name = scalar
         else:
             self.length_field_name = None
-            self.length_field_obj_id = id(scalar)
+            self.length_field_obj = scalar
 
     def __len__(self):
         return self.length
