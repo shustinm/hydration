@@ -2,8 +2,9 @@ import copy
 import inspect
 from collections import OrderedDict
 from contextlib import suppress
+from _ctypes import PyObj_FromPtr
 
-from .fields import Field
+from .fields import Field, VLA
 
 
 class StructMeta(type):
@@ -14,14 +15,13 @@ class StructMeta(type):
         footer_fields = OrderedDict()
         for base in filter(lambda x: issubclass(x, Struct), bases):
             for field_name in base._field_names:
-                try:
-                    if base._footer:
-                        footer_fields[field_name] = getattr(base, field_name)
-                except AttributeError:
+                if hasattr(base, '_footer') and base._footer:
+                    footer_fields[field_name] = getattr(base, field_name)
+                else:
                     base_fields[field_name] = getattr(base, field_name)
 
         # Check to see if any of the current attributes have already been defined
-        for k, v in attributes.items():
+        for k in attributes.keys():
             if k in base_fields or k in footer_fields:
                 raise NameError("Field '{}' was defined more than once".format(k))
 
@@ -43,6 +43,14 @@ class StructMeta(type):
             if isinstance(v, Field):
                 field_list.append(k)
                 attributes[k] = v
+                if isinstance(v, VLA):
+                    # Look for the name of the field which has the VLA's length
+                    for attr_name, attr in attributes.items():
+                        if attr is di(v.length_field_obj_id):
+                            v.length_field_name = attr_name
+                            break
+                    else:
+                        raise RuntimeError('Unable to find id {} for VLA {}'.format(v.length_field_obj_id, v))
 
         # Also save as attribute so it can be used to iterate over the fields in order
         attributes['_field_names'] = field_list
@@ -70,7 +78,7 @@ class Struct(metaclass=StructMeta):
 
     @property
     def _fields(self):
-        # Use standard getattribute because custom returns the field values instead
+        # Use object's getattribute because the Field overrides it
         return (object.__getattribute__(self, name) for name in self._field_names)
 
     # noinspection PyArgumentList
@@ -82,6 +90,7 @@ class Struct(metaclass=StructMeta):
         # if self is a subclass of Struct (and not Struct)
         if type(self) is not Struct:
             for name, param in inspect.signature(self.__init__).parameters.items():
+                # Check if the param is positional (required)
                 if param.default == inspect.Parameter.empty and param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
                     positional_args.append(name)
 
@@ -144,20 +153,32 @@ class Struct(metaclass=StructMeta):
         :param item:    The name of the item to get
         :return:        item's value, unless it's a field. In which case, the field's value
         """
-        fields = super().__getattribute__('_field_names')
+        # Use object's getattribute because Field overrides it
+        fields = object.__getattribute__(self, '_field_names')
         if item in fields:
-            return super().__getattribute__(item).value
-        return super().__getattribute__(item)
+            return object.__getattribute__(self, item).value
+        return object.__getattribute__(self, item)
 
     def __setattr__(self, key, value):
         """
         Has standard behavior, except when key references a field. In which case, set the field's value.
+        Also updates length sources of VLAs
 
         :param key:     The name of the attribute to set
         :param value:   The value to set
         :return:        None
         """
         if key in self._field_names and not isinstance(value, (Field, StructMeta)):
-            super().__getattribute__(key).value = value
+            # Use object's getattribute because Field overrides it
+            field = object.__getattribute__(self, key)
+            field.value = value
+            # Check if the field is a VLA
+            if isinstance(field, VLA):
+                # Set VLA source to the new length
+                setattr(self, field.length_field_name, len(field))
         else:
             super().__setattr__(key, value)
+
+
+def di(obj_id: int):
+    return PyObj_FromPtr(obj_id)

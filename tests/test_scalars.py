@@ -1,4 +1,5 @@
 import hydration as h
+import pytest
 
 
 class Gilad(h.Struct):
@@ -29,3 +30,26 @@ def test_field_types():
     assert type(x.flt) == float
     assert type(x.dub) == float
 
+
+def test_validation():
+    class Good(h.Struct):
+        i32 = h.Int32(5, validator=lambda z: z > 4)
+        i32_range = h.Int32(14, validator=lambda z: z in range(0, 30, 2))
+        i32_set = h.Int32(2, validator=lambda z: z in {1, 2, 3})
+
+    x = Good()
+
+    with pytest.raises(ValueError):
+        x.i32 = 3
+
+    with pytest.raises(ValueError):
+        x.i32_range = 15
+
+    with pytest.raises(ValueError):
+        x.i32_set = 4
+
+    with pytest.raises(ValueError):
+        class Bad(h.Struct):
+            i32 = h.Int32(5, validator=lambda y: y > 5)
+            i32_range = h.Int32(15, validator=lambda y: y in range(0, 30, 2))
+            i32_set = h.Int32(0, validator=lambda y: y in {1, 2, 3})

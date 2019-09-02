@@ -1,6 +1,6 @@
 import enum
 import struct
-from typing import Union
+from typing import Union, Callable
 
 from .fields import Field
 
@@ -16,11 +16,13 @@ class Endianness(enum.Enum):
 
 
 class Scalar(Field):
-    def __init__(self, value: scalar_values, endianness: Endianness):
+
+    def __init__(self, value: scalar_values, endianness: Endianness, validator: Callable = None):
         super().__init__()
-        self._value = value
+        self.validator = validator
         self.endianness_format = endianness.value if endianness else ''
         self.scalar_format = ScalarFormat(self.__class__).name
+        self.value = value
 
     @property
     def value(self):
@@ -36,6 +38,10 @@ class Scalar(Field):
     def validate(self, value):
         try:
             struct.pack(self.scalar_format, value)
+
+            if self.validator:
+                return self.validator(value)
+
         except struct.error:
             return False
         return True
@@ -68,14 +74,14 @@ class Scalar(Field):
 
 
 class _IntScalar(Scalar):
-    def __init__(self, value: int = 0, endianness: Endianness = None):
-        super().__init__(value, endianness)
+    def __init__(self, value: int = 0, endianness: Endianness = None, validator: Callable = None):
+        super().__init__(value, endianness, validator)
 
 
 class UInt8(_IntScalar):
     # Override constructor because this scalar doesn't have endianness
-    def __init__(self, value: int = 0):
-        super().__init__(value)
+    def __init__(self, value: int = 0, validator: Callable = None):
+        super().__init__(value, validator=validator)
 
 
 class UInt16(_IntScalar):
@@ -92,8 +98,8 @@ class UInt64(_IntScalar):
 
 class Int8(_IntScalar):
     # Override constructor because this scalar doesn't have endianness
-    def __init__(self, value: int = 0):
-        super().__init__(value)
+    def __init__(self, value: int = 0, validator: Callable = None):
+        super().__init__(value, validator=validator)
 
 
 class Int16(_IntScalar):
@@ -109,8 +115,8 @@ class Int64(_IntScalar):
 
 
 class _FloatScalar(Scalar):
-    def __init__(self, value: float = 0.0, endianness: Endianness = None):
-        super().__init__(float(value), endianness)
+    def __init__(self, value: float = 0.0, endianness: Endianness = None, validator: Callable = None):
+        super().__init__(float(value), endianness, validator)
 
 
 class Float(_FloatScalar):
