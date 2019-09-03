@@ -1,14 +1,15 @@
 import copy
 from abc import ABC
-from typing import Sequence, Optional, Type
+from typing import Sequence, Optional, Union
 from itertools import islice, chain
 
+from hydration import Struct
 from hydration.fields import Field, VLA
-from hydration.scalars import Scalar, scalar_values, _IntScalar
+from hydration.scalars import scalar_values, _IntScalar
 
 
 class _Sequence(Field, ABC):
-    def __init__(self, scalar_type: Scalar, value: Sequence[scalar_values] = ()):
+    def __init__(self, scalar_type: Union[Field, Struct], value: Sequence[scalar_values] = ()):
         self.type = scalar_type
         self._value = value
 
@@ -30,12 +31,18 @@ class _Sequence(Field, ABC):
     def __str__(self):
         return '{}{}'.format(self.type.__class__.__qualname__, self.value)
 
+    def __eq__(self, other):
+        return self.type == other.type and all (x == y for x, y in zip(self.value, other.value))
+
+    def __ne__(self, other):
+        return not self == other
+
     def validate(self, value):
         return all(self.type.validate(val) for val in value)
 
 
 class Array(_Sequence):
-    def __init__(self, scalar_type: Scalar, length: int, value: Optional[Sequence[scalar_values]] = ()):
+    def __init__(self, scalar_type: Union[Field, Struct], length: int, value: Optional[Sequence[scalar_values]] = ()):
         super().__init__(scalar_type)
         self.length = length
         self.value = tuple(value)
@@ -71,9 +78,10 @@ class Array(_Sequence):
 
 class Vector(_Sequence, VLA):
 
-    def __init__(self, scalar_type: Scalar, length: _IntScalar, value: Optional[Sequence] = ()):
+    def __init__(self, scalar_type: Union[Field, Struct], length: _IntScalar, value: Optional[Sequence] = ()):
         VLA.__init__(self, length)
-        _Sequence.__init__(self, scalar_type, value)
+        _Sequence.__init__(self, scalar_type, ())
+        self.value = value
 
     @property
     def value(self):
@@ -92,16 +100,22 @@ class Vector(_Sequence, VLA):
         self.length = len(value)
 
     def from_bytes(self, data: bytes):
-        if len(data) != len(self):
-            raise ValueError('Given bytes are too short for the field')
-
-        return super().from_bytes(data)
+        if isinstance(self.type, Field):
+            return super().from_bytes(data[:len(self) * len(self.type)])
+        else:
+            val = []
+            for _ in range(len(self)):
+                next_obj = self.type.from_bytes(data)
+                val.append(next_obj)
+                data = data[len(bytes(next_obj)):]
+            self.value = val
+            return self
 
     def __len__(self) -> int:
         return VLA.__len__(self)
 
     def __repr__(self) -> str:
-        pass
+        return str(self)
 
 
 def byte_chunks(x: bytes, chunk_size: int):

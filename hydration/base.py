@@ -2,7 +2,7 @@ import copy
 import inspect
 from collections import OrderedDict
 from contextlib import suppress
-from _ctypes import PyObj_FromPtr
+from pyhooks import Hook, precall_register, postcall_register
 
 from .fields import Field, VLA
 
@@ -99,7 +99,7 @@ class Struct(metaclass=StructMeta):
                              'Expected arguments: {} but {} given.'
                              .format(positional_args, len(args)))
 
-        # from_bytes needs the args and kwargs to create the class
+        # from_bytes needs the args to create the class
         # Set from_bytes as a private function
         self._from_bytes = self.from_bytes
 
@@ -109,6 +109,14 @@ class Struct(metaclass=StructMeta):
         # Deepcopy the fields so different instances of Struct have unique fields
         for name, field in zip(self._field_names, self._fields):
             setattr(self, name, copy.deepcopy(field))
+            # Initialize VLA length fields with proper values
+            if isinstance(field, VLA):
+                setattr(self, field.length_field_name, len(field))
+
+        for k, v in kwargs.items():
+            if k not in self._field_names:
+                raise ValueError('Unexpected kwarg given: {}={}'.format(k, v))
+            setattr(self, k, v)
 
     def __str__(self):
         x = [self.__class__.__qualname__]
@@ -134,17 +142,26 @@ class Struct(metaclass=StructMeta):
     def __ne__(self, other) -> bool:
         return not self == other
 
+    @Hook
     def __bytes__(self) -> bytes:
         return b''.join(map(bytes, self._fields))
+
+    pre_bytes_hook = precall_register('__bytes__')
+    post_bytes_hook = postcall_register('__bytes__')
 
     @classmethod
     def from_bytes(cls, data: bytes, *args):
         obj = cls(*args)
 
         for field in obj._fields:
-            split_index = len(field)
-            field_data, data = data[:split_index], data[split_index:]
-            field.value = field.from_bytes(field_data).value
+            if isinstance(field, VLA):
+                field.length = getattr(obj, field.length_field_name)
+                field.from_bytes(data)
+                data = data[len(bytes(field)):]
+            else:
+                split_index = len(field)
+                field_data, data = data[:split_index], data[split_index:]
+                field.value = field.from_bytes(field_data).value
 
         return obj
 

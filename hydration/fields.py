@@ -45,10 +45,11 @@ class Field(abc.ABC):
         return not self.value == other.value
 
 
-class VLA:
+class VLA(Field):
     """
     Used for fields that have variable length, their length parameter is stored in another field.
     """
+
     def __init__(self, scalar: Union[Field, str]):
         """
         The goal, in the end, is to have the name of the scalar that contains the length.
@@ -64,3 +65,26 @@ class VLA:
 
     def __len__(self):
         return self.length
+
+    @property
+    def value(self):
+        raise NotImplementedError
+
+    @value.setter
+    def value(self, value):
+        raise NotImplementedError
+
+    def __repr__(self) -> str:
+        raise NotImplementedError
+
+    def __str__(self) -> str:
+        raise NotImplementedError
+
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError
+
+    def from_bytes(self, data: bytes):
+        raise NotImplementedError
+
+    def validate(self, value):
+        raise NotImplementedError

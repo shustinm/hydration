@@ -4,7 +4,6 @@ from typing import Union, Callable
 
 from .fields import Field
 
-
 scalar_values = Union[int, float]
 
 
