@@ -1,6 +1,7 @@
 import enum
 import struct
-from typing import Union, Callable
+from enum import IntEnum
+from typing import Union, Callable, Type, Optional
 
 from .fields import Field
 
@@ -137,3 +138,52 @@ class ScalarFormat(enum.Enum):
     q = Int64
     f = Float
     d = Double
+
+
+class Enum(Field):
+    def __init__(self, scalar_type: _IntScalar, enum_class: Type[enum.IntEnum], value: Optional[enum.IntEnum] = None):
+        if scalar_type.value != 0:
+            raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
+        self.type = scalar_type
+        self.enum_class = enum_class
+        # noinspection PyTypeChecker
+        self.value = value or next(iter(self.enum_class))
+        self.type.value = self.value
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value: IntEnum):
+        if not self.validate(value):
+            raise ValueError('Given value {} is invalid for {} or for {}'.format(value, self.enum_class, self.type))
+        self.type.value = value
+        self._value = value
+
+    def __repr__(self) -> str:
+        return '{}({}, {}, {})'.format(self.__class__.__qualname__,
+                                       self.type,
+                                       self.enum_class,
+                                       self.value)
+
+    def __str__(self) -> str:
+        return '{}({})'.format(self.type.__class__.__qualname__, repr(self.value))
+
+    def __len__(self) -> int:
+        return len(self.type)
+
+    def __bytes__(self) -> bytes:
+        return bytes(self.type)
+
+    def from_bytes(self, data: bytes):
+        self.type.from_bytes(data)
+        self.value = self.type.value
+        return self
+
+    def validate(self, value):
+        try:
+            self.enum_class(value)
+        except ValueError:
+            return False
+        return self.type.validate(value)

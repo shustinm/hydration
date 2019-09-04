@@ -1,3 +1,5 @@
+import enum
+
 import hydration as h
 import pytest
 
@@ -53,3 +55,20 @@ def test_validation():
             i32 = h.Int32(5, validator=lambda y: y > 5)
             i32_range = h.Int32(15, validator=lambda y: y in range(0, 30, 2))
             i32_set = h.Int32(0, validator=lambda y: y in {1, 2, 3})
+
+
+class Guy(enum.IntEnum):
+    a = 1
+    b = 2
+    c = 3
+
+
+class Dar(h.Struct):
+    d = h.Enum(h.UInt32(), Guy)
+
+
+def test_enums():
+    assert Dar().d == Guy.a
+    x = Dar()
+    x.d = Guy.c
+    assert x.from_bytes(bytes(x)).d == Guy.c
