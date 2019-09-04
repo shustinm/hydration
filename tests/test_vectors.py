@@ -2,22 +2,22 @@ import hydration as h
 
 
 class Garzon(h.Struct):
-    arr = h.Array(scalar_type=h.UInt8(3), length=3, value=(1, 2))
+    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
     nested_vla_len = h.UInt16()
     nested_vla = h.Vector(h.Int32(), length=nested_vla_len, value=(9, 10, 100))
     x = h.UInt8(5)
 
 
 class Shine(h.Struct):
-    arr = h.Array(scalar_type=h.UInt8(3), length=3, value=(1, 2))
+    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
     vec_len = h.UInt8()
-    vec = h.Vector(scalar_type=h.UInt8(), length=vec_len)
+    vec = h.Vector(field_type=h.UInt8(), length=vec_len)
     y = h.UInt64(9)
     z_len = h.UInt8()
-    z = h.Vector(scalar_type=Garzon(), length=z_len, value=[
+    z = h.Vector(field_type=Garzon(), length=z_len, value=[
         Garzon(nested_vla=(11, 12, 13, 14, 15)), Garzon(arr=(9,)), Garzon()])
     vec2_len = h.UInt8()
-    vec2 = h.Vector(scalar_type=h.UInt32(), length=vec2_len, value=(53, 99, 123))
+    vec2 = h.Vector(field_type=h.UInt32(), length=vec2_len, value=(53, 99, 123))
     x = h.UInt16(104)
 
 
@@ -37,7 +37,7 @@ def test_vector_len_update():
 
 
 class Isaac(h.Struct):
-    arr = h.Array(scalar_type=h.UInt8(3), length=3, value=(1, 2))
+    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
     x = h.UInt8(5)
 
 

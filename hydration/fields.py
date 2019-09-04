@@ -50,18 +50,18 @@ class VLA(Field):
     Used for fields that have variable length, their length parameter is stored in another field.
     """
 
-    def __init__(self, scalar: Union[Field, str]):
+    def __init__(self, field: Union[Field, str]):
         """
         The goal, in the end, is to have the name of the scalar that contains the length.
         If not given in the __init__, StructMeta will fill the name itself.
-        :param scalar: The scalar (from the stuct or its' name)
+        :param field: The field (from the stuct or its' name)
         """
         self.length = 0
-        if isinstance(scalar, str):
-            self.length_field_name = scalar
+        if isinstance(field, str):
+            self.length_field_name = field
         else:
             self.length_field_name = None
-            self.length_field_obj = scalar
+            self.length_field_obj = field
 
     def __len__(self):
         return self.length

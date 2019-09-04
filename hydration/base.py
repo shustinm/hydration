@@ -83,8 +83,6 @@ class Struct(metaclass=StructMeta):
 
     # noinspection PyArgumentList
     def __init__(self, *args, **kwargs):
-        super().__init__()
-
         # Create a list of all the positional (required) arguments
         positional_args = []
         # if self is a subclass of Struct (and not Struct)
@@ -117,6 +115,8 @@ class Struct(metaclass=StructMeta):
             if k not in self._field_names:
                 raise ValueError('Unexpected kwarg given: {}={}'.format(k, v))
             setattr(self, k, v)
+
+        super().__init__()
 
     def __str__(self):
         x = [self.__class__.__qualname__]
@@ -159,7 +159,12 @@ class Struct(metaclass=StructMeta):
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
-                split_index = len(field)
+                from hydration.vectors import _Sequence
+                if isinstance(field, _Sequence):
+                    split_index = len(field) * len(field.type)
+                else:
+                    split_index = len(field)
+
                 field_data, data = data[:split_index], data[split_index:]
                 field.value = field.from_bytes(field_data).value
 
