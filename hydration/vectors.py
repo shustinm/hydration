@@ -3,15 +3,35 @@ from abc import ABC
 from typing import Sequence, Optional, Union, Any
 from itertools import islice, chain
 
-from hydration import Struct
-from hydration.fields import Field, VLA
-from hydration.scalars import _IntScalar
+from . import Struct
+from .fields import Field, VLA
+from .scalars import _IntScalar
+from .validators import Validator
 
 
 class _Sequence(Field, ABC):
-    def __init__(self, field_type: Union[Field, Struct], value: Sequence[Any] = ()):
+    def __init__(self, field_type: Union[Field, Struct],
+                 value: Sequence[Any] = (),
+                 validator: Optional[Validator] = None):
         self.type = field_type
+        self.validator = validator
         self.value = value
+
+    @property
+    def validator(self) -> Validator:
+        return self._validator
+
+    @validator.setter
+    def validator(self, value: Validator):
+        self._validator = value
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        self._value = value
 
     def __bytes__(self) -> bytes:
         field_type = copy.deepcopy(self.type)
@@ -31,41 +51,31 @@ class _Sequence(Field, ABC):
     def __str__(self):
         return '{}{}'.format(self.type.__class__.__qualname__, self.value)
 
-    def __eq__(self, other):
-        return self.type == other.type and all (x == y for x, y in zip(self.value, other.value))
-
-    def __ne__(self, other):
-        return not self == other
-
-    def validate(self, value):
-        return all(self.type.validate(val) for val in value)
-
-
-class Array(_Sequence):
-    def __init__(self, field_type: Union[Field, Struct], length: int, value: Optional[Sequence[Any]] = ()):
-        super().__init__(field_type)
-        self.length = length
-        self.value = tuple(value)
-
     def __repr__(self) -> str:
         return '{}(field_type={}, length={}, value={})'.format(
             self.__class__.__qualname__, self.type, len(self), self.value)
 
-    @property
-    def value(self):
-        return self._value
+    def __eq__(self, other):
+        return self.type == other.type and all(x == y for x, y in zip(self.value, other.value))
 
-    @value.setter
+    def __ne__(self, other):
+        return not self == other
+
+
+class Array(_Sequence):
+    def __init__(self, field_type: Union[Field, Struct], length: int, value: Optional[Sequence[Any]] = ()):
+        self.length = length
+        super().__init__(field_type)
+        self.value = tuple(value)
+
+    # noinspection PyAttributeOutsideInit
+    @_Sequence.value.setter
     def value(self, value: Sequence[Any]):
         # Make sure that the given value isn't too long
         if len(value) > len(self):
             raise ValueError('Given value is too long for the length given. Expected {} or less, given {}'.format(
                 len(self), len(value)
             ))
-
-        # Validate the given value
-        if not self.validate(value):
-            raise ValueError('Value {} is invalid for field type {}'.format(value, self.__class__.__qualname__))
 
         # Extend with the value of the default field value (extend might be empty)
         extend = tuple(self.type.value for _ in range(len(self) - len(value)))
@@ -83,16 +93,9 @@ class Vector(_Sequence, VLA):
         _Sequence.__init__(self, field_type, ())
         self.value = value
 
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
+    # noinspection PyAttributeOutsideInit
+    @_Sequence.value.setter
     def value(self, value):
-        # Validate the given value
-        if not self.validate(value):
-            raise ValueError('Value {} is invalid for field type {}'.format(value, self.__class__.__qualname__))
-
         # Convert value to a mutable list and set
         self._value = value
 
@@ -113,9 +116,6 @@ class Vector(_Sequence, VLA):
 
     def __len__(self) -> int:
         return VLA.__len__(self)
-
-    def __repr__(self) -> str:
-        return str(self)
 
 
 def byte_chunks(x: bytes, chunk_size: int):

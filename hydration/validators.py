@@ -45,3 +45,15 @@ class FunctionValidator(Validator):
     def validate(self, value: Any) -> None:
         if not self.func(value):
             raise ValueError('Calling {}({}) returned a False value'.format(self.func.__name__, value))
+
+
+class SetValidator(Validator):
+    def __init__(self, items: set):
+        """
+        :param items:   A set of items that are valid
+        """
+        self.items = set(items)
+
+    def validate(self, value: Any) -> None:
+        if value not in self.items:
+            raise ValueError('Given value {} is not in {}'.format(value, self.items))

@@ -1,8 +1,19 @@
 import abc
-from typing import Union
+from typing import Union, Optional
+from .validators import Validator
 
 
 class Field(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def validator(self) -> Validator:
+        raise NotImplementedError
+
+    @validator.setter
+    @abc.abstractmethod
+    def validator(self, value):
+        raise NotImplementedError
+
     @property
     @abc.abstractmethod
     def value(self):
@@ -34,10 +45,6 @@ class Field(abc.ABC):
     def from_bytes(cls, data: bytes):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def validate(self, value):
-        raise NotImplementedError
-
     def __eq__(self, other):
         return self.value == other.value
 
@@ -49,6 +56,10 @@ class VLA(Field):
     """
     Used for fields that have variable length, their length parameter is stored in another field.
     """
+
+    @property
+    def validator(self):
+        return None
 
     def __init__(self, field: Union[Field, str]):
         """
@@ -84,7 +95,4 @@ class VLA(Field):
         raise NotImplementedError
 
     def from_bytes(self, data: bytes):
-        raise NotImplementedError
-
-    def validate(self, value):
         raise NotImplementedError
