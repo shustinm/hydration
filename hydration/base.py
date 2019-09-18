@@ -170,6 +170,8 @@ class Struct(metaclass=StructMeta):
 
                 field_data, data = data[:split_index], data[split_index:]
                 field.value = field.from_bytes(field_data).value
+                with suppress(AttributeError):
+                    field.validator.validate(field.value)
 
         return obj
 

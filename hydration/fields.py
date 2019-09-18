@@ -1,9 +1,11 @@
 import abc
-from typing import Union, Optional
+from typing import Union
+
 from .validators import Validator
 
 
 class Field(abc.ABC):
+
     @property
     @abc.abstractmethod
     def validator(self) -> Validator:
