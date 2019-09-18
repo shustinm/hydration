@@ -4,6 +4,7 @@ from enum import IntEnum
 from typing import Union, Callable, Type, Optional
 
 from .fields import Field
+from .validators import Validator, FunctionValidator
 
 scalar_values = Union[int, float]
 
@@ -17,12 +18,19 @@ class Endianness(enum.Enum):
 
 class Scalar(Field):
 
-    def __init__(self, value: scalar_values, endianness: Endianness, validator: Callable = None):
-        super().__init__()
-        self.validator = validator
+    def __init__(self, value: scalar_values, endianness: Endianness, validator: Optional[Validator] = None):
         self.endianness_format = endianness.value if endianness else ''
         self.scalar_format = ScalarFormat(self.__class__).name
+        self.validator = validator
         self.value = value
+
+    @property
+    def validator(self) -> Validator:
+        return self._validator
+
+    @validator.setter
+    def validator(self, value: Validator):
+        self._validator = value
 
     @property
     def value(self):
@@ -30,21 +38,11 @@ class Scalar(Field):
 
     @value.setter
     def value(self, value):
-        if self.validate(value):
-            self._value = value
-        else:
-            raise ValueError('Value {} is invalid for field type {}'.format(value, self.__class__.__qualname__))
-
-    def validate(self, value):
         try:
             struct.pack(self.scalar_format, value)
-
-            if self.validator:
-                return self.validator(value)
-
-        except struct.error:
-            return False
-        return True
+        except struct.error as e:
+            raise ValueError('Value {} is invalid for field type {}: {}'.format(value, self.__class__.__qualname__, e))
+        self._value = value
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__qualname__, self.value)
@@ -74,13 +72,13 @@ class Scalar(Field):
 
 
 class _IntScalar(Scalar):
-    def __init__(self, value: int = 0, endianness: Endianness = None, validator: Callable = None):
+    def __init__(self, value: int = 0, endianness: Optional[Endianness] = None, validator: Optional[Validator] = None):
         super().__init__(value, endianness, validator)
 
 
 class UInt8(_IntScalar):
     # Override constructor because this scalar doesn't have endianness
-    def __init__(self, value: int = 0, validator: Callable = None):
+    def __init__(self, value: int = 0, validator: Optional[Validator] = None):
         super().__init__(value, validator=validator)
 
 
@@ -98,7 +96,7 @@ class UInt64(_IntScalar):
 
 class Int8(_IntScalar):
     # Override constructor because this scalar doesn't have endianness
-    def __init__(self, value: int = 0, validator: Callable = None):
+    def __init__(self, value: int = 0, validator: Optional[Validator] = None):
         super().__init__(value, validator=validator)
 
 
@@ -142,6 +140,7 @@ class ScalarFormat(enum.Enum):
 
 class Enum(Field):
     def __init__(self, scalar_type: _IntScalar, enum_class: Type[enum.IntEnum], value: Optional[enum.IntEnum] = None):
+        super().__init__()
         if scalar_type.value != 0:
             raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
         self.type = scalar_type
@@ -151,13 +150,15 @@ class Enum(Field):
         self.type.value = self.value
 
     @property
+    def validator(self) -> Validator:
+        return FunctionValidator(lambda x: x in (m.value for m in self.enum_class))
+
+    @property
     def value(self):
         return self._value
 
     @value.setter
     def value(self, value: IntEnum):
-        if not self.validate(value):
-            raise ValueError('Given value {} is invalid for {} or for {}'.format(value, self.enum_class, self.type))
         self.type.value = value
         self._value = value
 
@@ -181,9 +182,3 @@ class Enum(Field):
         self.value = self.type.value
         return self
 
-    def validate(self, value):
-        try:
-            self.enum_class(value)
-        except ValueError:
-            return False
-        return self.type.validate(value)

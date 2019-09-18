@@ -106,6 +106,9 @@ class Struct(metaclass=StructMeta):
 
         # Deepcopy the fields so different instances of Struct have unique fields
         for name, field in zip(self._field_names, self._fields):
+            # Validate the values
+            with suppress(AttributeError):
+                field.validator.validate(field.value)
             setattr(self, name, copy.deepcopy(field))
             # Initialize VLA length fields with proper values
             if isinstance(field, VLA):
@@ -167,6 +170,8 @@ class Struct(metaclass=StructMeta):
 
                 field_data, data = data[:split_index], data[split_index:]
                 field.value = field.from_bytes(field_data).value
+                with suppress(AttributeError):
+                    field.validator.validate(field.value)
 
         return obj
 
@@ -193,6 +198,8 @@ class Struct(metaclass=StructMeta):
         if key in self._field_names and not isinstance(value, (Field, StructMeta)):
             # Use object's getattribute because Field overrides it
             field = object.__getattribute__(self, key)
+            with suppress(AttributeError):
+                field.validator.validate(value)
             field.value = value
             # Check if the field is a VLA
             if isinstance(field, VLA):
