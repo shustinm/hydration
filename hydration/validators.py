@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 
 class Validator(ABC):
@@ -57,3 +57,14 @@ class SetValidator(Validator):
     def validate(self, value: Any) -> None:
         if value not in self.items:
             raise ValueError('Given value {} is not in {}'.format(value, self.items))
+
+
+class SequenceValidator(Validator):
+    def __init__(self, scalar_validator: Validator):
+        """
+        :param scalar_validator:    A validator to validate the scalars
+        """
+        self.validator = scalar_validator
+
+    def validate(self, value: Iterable):
+        map(self.validate, value)

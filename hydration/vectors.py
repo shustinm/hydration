@@ -5,8 +5,8 @@ from itertools import islice, chain
 
 from . import Struct
 from .fields import Field, VLA
-from .scalars import _IntScalar
-from .validators import Validator
+from .scalars import _IntScalar, UInt8
+from .validators import Validator, SequenceValidator
 
 
 class _Sequence(Field, ABC):
@@ -23,7 +23,7 @@ class _Sequence(Field, ABC):
 
     @validator.setter
     def validator(self, value: Validator):
-        self._validator = value
+        self._validator = SequenceValidator(value)
 
     @property
     def value(self):
@@ -65,8 +65,7 @@ class _Sequence(Field, ABC):
 class Array(_Sequence):
     def __init__(self, field_type: Union[Field, Struct], length: int, value: Optional[Sequence[Any]] = ()):
         self.length = length
-        super().__init__(field_type)
-        self.value = tuple(value)
+        super().__init__(field_type, value)
 
     # noinspection PyAttributeOutsideInit
     @_Sequence.value.setter
@@ -116,6 +115,21 @@ class Vector(_Sequence, VLA):
 
     def __len__(self) -> int:
         return VLA.__len__(self)
+
+
+class IPv4(Array):
+    def __init__(self, value: str = '0.0.0.0'):
+        super().__init__(UInt8(), 4, value)
+
+    @_Sequence.value.setter
+    def value(self, value: str):
+        x = value.split('.')
+        if len(x) != 4:
+            raise ValueError('IP length mismatch. Expected 4, got {}'.format(len(x)))
+        self._value = tuple(int(z) for z in x)
+
+    def __str__(self):
+        return '.'.join(str(self.value))
 
 
 def byte_chunks(x: bytes, chunk_size: int):

@@ -57,3 +57,10 @@ def test_good_validator():
     class Shustin(h.Struct):
         # arr = h.Array(scalar_type=h.UInt8(8), length=3, validator=lambda items: all(item > 7 for item in items))
         pass
+
+
+def test_ipv4():
+    class Venice(h.Struct):
+        ip = h.IPv4()
+
+    print(Venice())
