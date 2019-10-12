@@ -67,7 +67,7 @@ class VLA(Field):
         """
         The goal, in the end, is to have the name of the scalar that contains the length.
         If not given in the __init__, StructMeta will fill the name itself.
-        :param field: The field (from the stuct or its' name)
+        :param field: The field (from the struct or its' name)
         """
         self.length = 0
         if isinstance(field, str):
