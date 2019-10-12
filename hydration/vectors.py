@@ -49,7 +49,7 @@ class _Sequence(Field, ABC):
         return self
 
     def __str__(self):
-        return '{}{}'.format(self.type.__class__.__qualname__, self.value)
+        return '{}{}'.format(self.__class__.__qualname__, self.value)
 
     def __repr__(self) -> str:
         return '{}(field_type={}, length={}, value={})'.format(
@@ -76,10 +76,10 @@ class Array(_Sequence):
                 len(self), len(value)
             ))
 
-        # Extend with the value of the default field value (extend might be empty)
-        extend = tuple(self.type.value for _ in range(len(self) - len(value)))
+        # Extend with the value of the default field value to fill the length (this tuple might be empty)
+        extension = (self.type.value,) * (len(self) - len(value))
 
-        self._value = tuple(chain(value, extend))
+        self._value = tuple(chain(value, extension))
 
     def __len__(self) -> int:
         return self.length

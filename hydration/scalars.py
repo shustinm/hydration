@@ -65,7 +65,7 @@ class Scalar(Field):
         return float(self.value)
 
     def from_bytes(self, data: bytes):
-        format_string = '{}{}'.format(self.endianness_format, ScalarFormat(self.__class__).name)
+        format_string = '{}{}'.format(self.endianness_format, self.scalar_format)
         # noinspection PyAttributeOutsideInit
         self.value = struct.unpack(format_string, data)[0]
         return self
