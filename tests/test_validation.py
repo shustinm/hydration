@@ -29,6 +29,7 @@ def test_validation_types():
         i32 = h.Int32(5, validator=h.FunctionValidator(lambda z: z > 4))
         i32_range = h.Int32(14, validator=h.RangeValidator(range(0, 30, 2)))
         i32_set = h.Int32(2, validator=h.SetValidator({1, 2, 3}))
+        i32_arr = h.Array(length=5, field_type=h.UInt8(5), validator=h.ExactValueValidator(5))
 
     x = Good()
 
@@ -40,3 +41,6 @@ def test_validation_types():
 
     with pytest.raises(ValueError):
         x.i32_set = 4
+
+    with pytest.raises(ValueError):
+        x.i32_arr = [5, 5, 5, 5, 4]

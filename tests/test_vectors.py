@@ -4,7 +4,7 @@ import hydration as h
 class Garzon(h.Struct):
     arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
     nested_vla_len = h.UInt16()
-    nested_vla = h.Vector(h.Int32(), length=nested_vla_len, value=(9, 10, 100))
+    nested_vla = h.Vector(field_type=h.Int32(), length=nested_vla_len, value=(9, 10, 100))
     x = h.UInt8(5)
 
 
