@@ -66,3 +66,37 @@ class MyStruct(MyStructFooter, MyStructHeader, MyStructBody):
 
 def test_footer():
     assert bytes(MyStruct()) == b'\x01\x02\x03\x04'
+
+
+def test_from_bytes_reader():
+    class Shustin(h.Struct):
+        length = h.UInt16()
+        data = h.Vector(length=length, field_type=h.UInt8())
+
+    class NadavLoYazam(h.Struct):
+        nadav = h.UInt8()
+        lo = h.UInt16()
+        yazam = h.UInt32()
+        bihlal = h.UInt64()
+
+    class MockReader:
+        def __init__(self, data: bytes):
+            self._data = data
+
+        def read(self, size=0):
+            user_data, self._data = self._data[:size], self._data[size:]
+            return user_data
+
+    shustin = Shustin()
+    shustin.length = 32
+    shustin.data = [x for x in range(0, 32, 1)]
+    my_shustin = Shustin.from_bytes(MockReader(bytes(shustin)).read)
+    assert bytes(shustin) == bytes(my_shustin)
+
+    nadav = NadavLoYazam()
+    nadav.nadav = 3
+    nadav.lo = 854
+    nadav.yazam = 1512
+    nadav.bihlal = 38272
+    nadav_lo_yazam = NadavLoYazam.from_bytes(MockReader(bytes(nadav)).read)
+    assert bytes(nadav) == bytes(nadav_lo_yazam)

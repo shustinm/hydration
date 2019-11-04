@@ -3,6 +3,7 @@ import inspect
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
+from typing import Union, Callable
 
 from .fields import Field, VLA
 
@@ -153,9 +154,31 @@ class Struct(metaclass=StructMeta):
     post_bytes_hook = postcall_register('__bytes__')
 
     @classmethod
-    def from_bytes(cls, data: bytes, *args):
+    def from_bytes(cls, data_or_callable: Union[bytes, Callable[[int], bytes]], *args):
+        """
+        Deserialize raw data to Struct object .
+        :param data_or_callable: The raw data (bytes) or a reader function (used for readers that reads data with known maximum
+        size, like serial reader).
+        :param args: Arguments for the __init__ of the fields.
+        :return: The deserialized object.
+        """
         obj = cls(*args)
+        instance_types = {
+            bytes: cls._from_bytes,
+            Callable: cls._from_bytes_reader
+        }
 
+        for instance_type, from_bytes_func in instance_types.items():
+            if isinstance(data_or_callable, instance_type):
+                from_bytes_func(obj, data_or_callable)
+                break
+        else:
+            raise TypeError('Invalid type {type} for from_bytes function'.format(type=type(data_or_callable)))
+
+        return obj
+
+    @staticmethod
+    def _from_bytes(obj, data: bytes):
         for field in obj._fields:
             if isinstance(field, VLA):
                 field.length = getattr(obj, field.length_field_name)
@@ -173,7 +196,24 @@ class Struct(metaclass=StructMeta):
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 
-        return obj
+    @staticmethod
+    def _from_bytes_reader(obj, read_func: Callable[[int], bytes]):
+        for field in obj._fields:
+            if isinstance(field, VLA):
+                field.length = getattr(obj, field.length_field_name)
+                data = read_func(field.length)
+                field.from_bytes(data)
+            else:
+                from hydration.vectors import _Sequence
+                if isinstance(field, _Sequence):
+                    read_size = len(field) * len(field.type)
+                else:
+                    read_size = len(field)
+
+                data = read_func(read_size)
+                field.value = field.from_bytes(data).value
+                with suppress(AttributeError):
+                    field.validator.validate(field.value)
 
     def __getattribute__(self, item):
         """

@@ -63,9 +63,12 @@ class _Sequence(Field, ABC):
 
 
 class Array(_Sequence):
-    def __init__(self, field_type: Union[Field, Struct], length: int, value: Optional[Sequence[Any]] = ()):
+    def __init__(self, length: int,
+                 field_type: Union[Field, Struct] = UInt8(),
+                 value: Optional[Sequence[Any]] = (),
+                 validator: Optional[Validator] = None):
         self.length = length
-        super().__init__(field_type, value)
+        super().__init__(field_type=field_type, value=value, validator=validator)
 
     # noinspection PyAttributeOutsideInit
     @_Sequence.value.setter
@@ -87,9 +90,12 @@ class Array(_Sequence):
 
 class Vector(_Sequence, VLA):
 
-    def __init__(self, field_type: Union[Field, Struct], length: _IntScalar, value: Optional[Sequence[Any]] = ()):
+    def __init__(self, length: _IntScalar,
+                 field_type: Union[Field, Struct] = UInt8(),
+                 value: Optional[Sequence[Any]] = (),
+                 validator: Optional[Validator] = None):
         VLA.__init__(self, length)
-        _Sequence.__init__(self, field_type, ())
+        _Sequence.__init__(self, field_type=field_type, value=(), validator=validator)
         self.value = value
 
     # noinspection PyAttributeOutsideInit
@@ -119,7 +125,7 @@ class Vector(_Sequence, VLA):
 
 class IPv4(Array):
     def __init__(self, value: str = '0.0.0.0'):
-        super().__init__(UInt8(), 4, value)
+        super().__init__(field_type=UInt8(), length=4, value=value)
 
     @_Sequence.value.setter
     def value(self, value: str):

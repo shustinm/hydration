@@ -67,4 +67,5 @@ class SequenceValidator(Validator):
         self.validator = scalar_validator
 
     def validate(self, value: Iterable):
-        map(self.validate, value)
+        for val in value:
+            self.validator.validate(val)
