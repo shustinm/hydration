@@ -3,7 +3,7 @@ import inspect
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Union
+from typing import Union, Callable
 
 from .fields import Field, VLA
 
@@ -62,27 +62,6 @@ class StructMeta(type):
     def __prepare__(mcs, name, bases):
         # Attributes need to be iterated in order of definition
         return OrderedDict()
-
-
-class ReadableMeta(type):
-    """
-    Meta-class that used to change the isinstance function result when using the Readable
-    class as a type. Instead of checking if the instance is a real instance of Readable,
-    it will check if the instance has a function that called read, and that the function
-    has an argument that called size.
-    """
-    def __instancecheck__(self, instance):
-        read_func = getattr(instance, 'read', None)
-        if callable(read_func) and 'size' in inspect.getfullargspec(read_func).args:
-            param = inspect.signature(read_func).parameters.get('size')
-            if param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-                return True
-
-        return False
-
-
-class Readable(metaclass=ReadableMeta):
-    pass
 
 
 class Struct(metaclass=StructMeta):
@@ -175,58 +154,66 @@ class Struct(metaclass=StructMeta):
     post_bytes_hook = postcall_register('__bytes__')
 
     @classmethod
-    def from_bytes(cls, data_or_reader: Union[bytes, Readable], *args):
+    def from_bytes(cls, data_or_callable: Union[bytes, Callable[[int], bytes]], *args):
         """
         Deserialize raw data to Struct object .
-        :param data_or_reader: The raw data (bytes) or a reader object (used for readers that reads data with known maximum
+        :param data_or_callable: The raw data (bytes) or a reader function (used for readers that reads data with known maximum
         size, like serial reader).
         :param args: Arguments for the __init__ of the fields.
         :return: The deserialized object.
         """
         obj = cls(*args)
+        instance_types = {
+            bytes: cls._from_bytes,
+            Callable: cls._from_bytes_reader
+        }
 
-        if isinstance(data_or_reader, bytes):
-            for field in obj._fields:
-                if isinstance(field, VLA):
-                    field.length = getattr(obj, field.length_field_name)
-                    field.from_bytes(data_or_reader)
-                    data_or_reader = data_or_reader[len(bytes(field)):]
-                else:
-                    from hydration.vectors import _Sequence
-                    if isinstance(field, _Sequence):
-                        split_index = len(field) * len(field.type)
-                    else:
-                        split_index = len(field)
-
-                    field_data, data_or_reader = data_or_reader[:split_index], data_or_reader[split_index:]
-                    field.value = field.from_bytes(field_data).value
-                    with suppress(AttributeError):
-                        field.validator.validate(field.value)
-
-            return obj
-
-        elif isinstance(data_or_reader, Readable):
-            for field in obj._fields:
-                if isinstance(field, VLA):
-                    field.length = getattr(obj, field.length_field_name)
-                    data = data_or_reader.read(size=field.length)
-                    field.from_bytes(data)
-                else:
-                    from hydration.vectors import _Sequence
-                    if isinstance(field, _Sequence):
-                        read_size = len(field) * len(field.type)
-                    else:
-                        read_size = len(field)
-
-                    data = data_or_reader.read(size=read_size)
-                    field.value = field.from_bytes(data).value
-                    with suppress(AttributeError):
-                        field.validator.validate(field.value)
-
-            return obj
-
+        for instance_type, from_bytes_func in instance_types.items():
+            if isinstance(data_or_callable, instance_type):
+                from_bytes_func(obj, data_or_callable)
+                break
         else:
-            raise TypeError('Invalid type {type} for from_bytes function'.format(type=type(data_or_reader)))
+            raise TypeError('Invalid type {type} for from_bytes function'.format(type=type(data_or_callable)))
+
+        return obj
+
+    @staticmethod
+    def _from_bytes(obj, data: bytes):
+        for field in obj._fields:
+            if isinstance(field, VLA):
+                field.length = getattr(obj, field.length_field_name)
+                field.from_bytes(data)
+                data = data[len(bytes(field)):]
+            else:
+                from hydration.vectors import _Sequence
+                if isinstance(field, _Sequence):
+                    split_index = len(field) * len(field.type)
+                else:
+                    split_index = len(field)
+
+                field_data, data = data[:split_index], data[split_index:]
+                field.value = field.from_bytes(field_data).value
+                with suppress(AttributeError):
+                    field.validator.validate(field.value)
+
+    @staticmethod
+    def _from_bytes_reader(obj, read_func: Callable[[int], bytes]):
+        for field in obj._fields:
+            if isinstance(field, VLA):
+                field.length = getattr(obj, field.length_field_name)
+                data = read_func(field.length)
+                field.from_bytes(data)
+            else:
+                from hydration.vectors import _Sequence
+                if isinstance(field, _Sequence):
+                    read_size = len(field) * len(field.type)
+                else:
+                    read_size = len(field)
+
+                data = read_func(read_size)
+                field.value = field.from_bytes(data).value
+                with suppress(AttributeError):
+                    field.validator.validate(field.value)
 
     def __getattribute__(self, item):
         """
