@@ -1,79 +1,16 @@
-from abc import abstractmethod
-from .base import Struct
-from contextlib import suppress
+from typing import Iterable
+from itertools import tee
 import struct
 
 
-class MessageStruct(Struct):
-    """
-    Structs that want to integrate with messages must implement these properties
-    """
-
-    @property
-    @abstractmethod
-    def id(self):
-        """
-        :return: A numerical ID that represents this struct (opcode).
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def name(self):
-        """
-        :return: A name of this struct, a message can't have two structs with the same name.
-        """
-        raise NotImplementedError
-
-
-class Header:
-
-    @property
-    @abstractmethod
-    def len_of_child(self):
-        raise NotImplementedError
-
-    @len_of_child.setter
-    @abstractmethod
-    def len_of_child(self, value):
-        raise NotImplementedError
-
-    def append(self, body, checks=True):
-        return Message([self, body], checks)
-
-    def __truediv__(self, other):
-        return self.append(other)
-
-    def __floordiv__(self, other):
-        return self.append(other, checks=False)
-
-    @property
-    @abstractmethod
-    def child_id(self):
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def name(self):
-        raise NotImplementedError
-
-
 class Message:
-    def __init__(self, layers, checks=True):
-        for layer in layers[:-1]:
-            self._assert_is_header(layer)
+    def __init__(self, layers: Iterable):
+        self.layers = list(layers)
 
-        self.layers = layers
-
-        if checks:
-            self._update_struct_lengths()
-            self._update_opcode()
+        self._update_metas()
 
         for layer in layers:
-            with suppress(AttributeError):
-                if hasattr(self, layer.name):
-                    raise NameError('Message {} already has a layer named {}'.format(self, layer.name))
-                setattr(self, layer.name, layer)
+            self._add_name_of_layer(layer)
 
     def serialize(self):
         try:
@@ -81,44 +18,27 @@ class Message:
         except struct.error as e:
             raise ValueError(str(e))
 
-    def append(self, layer, checks=True):
-        if isinstance(layer, MessageStruct):
-            self._assert_is_header(self.layers[-1])
-
+    def append(self, layer):
         self.layers.append(layer)
+        self._update_metas()
+        if hasattr(layer, 'name'):
+            self._add_name_of_layer(layer)
 
-        if checks:
-            self._update_struct_lengths()
-            self._update_opcode()
-
-    def _update_struct_lengths(self):
+    def _update_metas(self):
         """
-        Iterate from the penultimate (1 before the last) layer to the first layer,
-        setting its
+        Iterate from the penultimate (1 before the last) layer to the first layer, connect metas
         :return:
         """
-        for i in range(len(self.layers) - 2, -1, -1):
-            child = self.layers[i + 1]
+        for index, layer in enumerate(self.layers[-2::-1]):
+            for k, v in self.layers[index + 1].meta_up.items():
+                # setattr(layer, layer.meta_down[k], v)
+                layer.meta_down[k]
 
-            depth_len = getattr(child, 'len_of_child', 0)
-
-            try:
-                self.layers[i].body_len = len(child) + depth_len
-            except AttributeError:
-                pass
-
-    def _update_opcode(self):
-        """
-        Update the penultimate (1 before the last) layer's opcode to match the last layer
-        :return:
-        """
-        with suppress(NotImplementedError, AttributeError):
-            self.layers[-2].child_id = self.layers[-1].id
-
-    @staticmethod
-    def _assert_is_header(layer):
-        if not isinstance(layer, Header):
-            raise ValueError('The last layer is not of type {}. You cannot append more layers'.format(Header))
+    def _add_name_of_layer(self, layer):
+        if getattr(layer, 'name'):
+            if hasattr(self, layer.name):
+                raise NameError('Message {} already has a layer named {}'.format(self, layer.name))
+            setattr(self, layer.name, layer)
 
     def __eq__(self, other):
         if isinstance(other, Message):
@@ -130,14 +50,10 @@ class Message:
 
     def __str__(self):
         # __str__ every layer and insert a line between each layer
-        return '\n{}\n'.format('-' * 10).join(repr(layer) for layer in self.layers)
+        return '\n{}\n'.format('-' * 10).join(str(layer) for layer in self.layers)
 
     def __truediv__(self, other):
         self.append(other)
-        return self
-
-    def __floordiv__(self, other):
-        self.append(other, checks=False)
         return self
 
     def __getitem__(self, item):

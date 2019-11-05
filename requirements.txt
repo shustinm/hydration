@@ -1,2 +1,2 @@
 pytest
-pyhooks
+pyhooks>=1.0.3

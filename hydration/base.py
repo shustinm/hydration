@@ -4,6 +4,7 @@ from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
 from typing import Union, Callable
+from hydration.message import Message
 
 from .fields import Field, VLA
 
@@ -82,6 +83,18 @@ class Struct(metaclass=StructMeta):
         # Use object's getattribute because the Field overrides it
         return (object.__getattribute__(self, name) for name in self._field_names)
 
+    @property
+    def meta_up(self):
+        return {}
+
+    @property
+    def meta_down(self):
+        return {}
+
+    @property
+    def name(self):
+        return None
+
     # noinspection PyArgumentList
     def __init__(self, *args, **kwargs):
         # Create a list of all the positional (required) arguments
@@ -145,6 +158,9 @@ class Struct(metaclass=StructMeta):
 
     def __ne__(self, other) -> bool:
         return not self == other
+
+    def __truediv__(self, other):
+        return Message([self, other])
 
     @Hook
     def __bytes__(self) -> bytes:
@@ -224,6 +240,9 @@ class Struct(metaclass=StructMeta):
         fields = object.__getattribute__(self, '_field_names')
         if item in fields:
             return object.__getattribute__(self, item).value
+        return object.__getattribute__(self, item)
+
+    def __getitem__(self, item):
         return object.__getattribute__(self, item)
 
     def __setattr__(self, key, value):

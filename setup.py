@@ -9,5 +9,5 @@ setuptools.setup(
     author='Michael Shustin',
     author_email='michaelshustin@gmail.com',
     packages=['hydration'],
-    install_requires=['pyhooks']
+    install_requires=['pyhooks>=1.0.3']
 )
