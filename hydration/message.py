@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Callable
 from itertools import tee
 import struct
 
@@ -24,15 +24,18 @@ class Message:
         if hasattr(layer, 'name'):
             self._add_name_of_layer(layer)
 
+    # noinspection PyProtectedMember
     def _update_metas(self):
         """
         Iterate from the penultimate (1 before the last) layer to the first layer, connect metas
         :return:
         """
         for index, layer in enumerate(self.layers[-2::-1]):
-            for k, v in self.layers[index + 1].meta_up.items():
-                # setattr(layer, layer.meta_down[k], v)
-                layer.meta_down[k]
+            child_layer = self.layers[index + 1]
+            for k, v in child_layer._meta_up.items():
+                down_value = v(child_layer) if callable(v) else v
+                layer._meta_down[k] = down_value
+                setattr(layer, )
 
     def _add_name_of_layer(self, layer):
         if getattr(layer, 'name'):

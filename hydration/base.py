@@ -3,13 +3,14 @@ import inspect
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Union, Callable
+from typing import Union, Callable, Any
 from hydration.message import Message
 
 from .fields import Field, VLA
 
 
 class StructMeta(type):
+    # noinspection PyProtectedMember
     def __new__(mcs, name, bases, attributes):
 
         # Load all the fields from the parent classes
@@ -56,6 +57,11 @@ class StructMeta(type):
 
         # Also save as attribute so it can be used to iterate over the fields in order
         attributes['_field_names'] = field_list
+        if bases and issubclass(mcs, Struct):
+            attributes['_meta_up'] = Struct._meta_up.copy()
+            attributes['_meta_down'] = Struct._meta_down.copy()
+            Struct._meta_up.clear()
+            Struct._meta_down.clear()
 
         return super().__new__(mcs, name, bases, attributes)
 
@@ -84,16 +90,19 @@ class Struct(metaclass=StructMeta):
         return (object.__getattribute__(self, name) for name in self._field_names)
 
     @property
-    def meta_up(self):
-        return {}
-
-    @property
-    def meta_down(self):
-        return {}
-
-    @property
     def name(self):
         return None
+
+    _meta_down = {}
+    _meta_up = {}
+
+    @classmethod
+    def add_body_connection(cls, name: str, field: Field):
+        cls._meta_down[name] = field
+
+    @classmethod
+    def add_header_connection(cls, name: str, value_or_callable: Union[Any, Callable]):
+        cls._meta_up[name] = value_or_callable
 
     # noinspection PyArgumentList
     def __init__(self, *args, **kwargs):
