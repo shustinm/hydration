@@ -1,6 +1,20 @@
-from typing import Iterable, Callable
+from typing import Iterable, Callable, Protocol, Optional
 from itertools import tee
 import struct
+from hydration.fields import Field
+
+
+class MessageStruct(Protocol):
+    _call_name: Optional[str]
+
+
+class Header(MessageStruct, Protocol):
+    body_len: Field
+    body_opcode: Field
+
+
+class Body(MessageStruct, Protocol):
+    opcode: int
 
 
 class Message:
@@ -26,7 +40,7 @@ class Message:
 
     # noinspection PyProtectedMember
     def _update_metas(self):
-        """
+        """ FIXME: change to protocols
         Iterate from the penultimate (1 before the last) layer to the first layer, connect metas
         :return:
         """
