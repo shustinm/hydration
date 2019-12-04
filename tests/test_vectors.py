@@ -1,3 +1,5 @@
+import pytest
+
 import hydration as h
 
 
@@ -55,12 +57,15 @@ def test_array():
 
 def test_good_validator():
     class Shustin(h.Struct):
-        # arr = h.Array(scalar_type=h.UInt8(8), length=3, validator=lambda items: all(item > 7 for item in items))
-        pass
+        arr = h.Array(3, h.UInt8(8), validator=h.FunctionValidator(lambda x: x > 7))
+
+    assert Shustin()
 
 
+@pytest.mark.xfail(condition=True,
+                   reason="Can't call methods on structs because they're returned as values from struct")
 def test_ipv4():
     class Venice(h.Struct):
         ip = h.IPv4()
 
-    print(Venice())
+    assert str(Venice().ip) == '0.0.0.0'

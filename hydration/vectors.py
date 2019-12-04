@@ -135,7 +135,7 @@ class IPv4(Array):
         self._value = tuple(int(z) for z in x)
 
     def __str__(self):
-        return '.'.join(str(self.value))
+        return '.'.join(str(x) for x in self.value)
 
 
 def byte_chunks(x: bytes, chunk_size: int):

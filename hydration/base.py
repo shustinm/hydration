@@ -1,10 +1,10 @@
 import copy
 import inspect
+import struct
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Union, Callable, Any
-from hydration.message import Message
+from typing import Union, Callable
 
 from .fields import Field, VLA
 
@@ -148,11 +148,15 @@ class Struct(metaclass=StructMeta):
         return not self == other
 
     def __truediv__(self, other):
-        return Message([self, other])
+        from .message import Message
+        return Message((self, other))
 
     @Hook
     def __bytes__(self) -> bytes:
-        return b''.join(map(bytes, self._fields))
+        try:
+            return b''.join(map(bytes, self._fields))
+        except struct.error as e:
+            raise ValueError(str(e))
 
     pre_bytes_hook = precall_register('__bytes__')
     post_bytes_hook = postcall_register('__bytes__')
