@@ -148,37 +148,30 @@ class Struct(metaclass=StructMeta):
 
     @Hook
     def __bytes__(self) -> bytes:
+        return self.serialize()
+        
+    def serialize(self) -> bytes:
+        """
+        Serialize the Struct object into bytes.
+        You may use this function instead of bytes() if you don't want the bytes hook
+        be hooked.
+        """
         return b''.join(map(bytes, self._fields))
 
     pre_bytes_hook = precall_register('__bytes__')
     post_bytes_hook = postcall_register('__bytes__')
 
     @classmethod
-    def from_bytes(cls, data_or_callable: Union[bytes, Callable[[int], bytes]], *args):
+    def from_bytes(cls, data: bytes, *args):
         """
         Deserialize raw data to Struct object .
-        :param data_or_callable: The raw data (bytes) or a reader function (used for readers that reads data with known maximum
-        size, like serial reader).
+        :param data: The raw data (bytes).
         :param args: Arguments for the __init__ of the fields.
         :return: The deserialized object.
         """
+
         obj = cls(*args)
-        instance_types = {
-            bytes: cls._from_bytes,
-            Callable: cls._from_bytes_reader
-        }
-
-        for instance_type, from_bytes_func in instance_types.items():
-            if isinstance(data_or_callable, instance_type):
-                from_bytes_func(obj, data_or_callable)
-                break
-        else:
-            raise TypeError('Invalid type {type} for from_bytes function'.format(type=type(data_or_callable)))
-
-        return obj
-
-    @staticmethod
-    def _from_bytes(obj, data: bytes):
+        
         for field in obj._fields:
             if isinstance(field, VLA):
                 field.length = getattr(obj, field.length_field_name)
@@ -196,12 +189,23 @@ class Struct(metaclass=StructMeta):
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 
-    @staticmethod
-    def _from_bytes_reader(obj, read_func: Callable[[int], bytes]):
+        return obj
+
+    @classmethod
+    def from_stream(cls, stream_func: Callable[[int], bytes], *args):
+        """
+        Deserialize a Struct object from a stream.
+        :param stream_func: The stream reader function.
+        :param args: Arguments for the __init__ of the fields.
+        :return: The deserialized object.
+        """
+        
+        obj = cls(*args)
+
         for field in obj._fields:
             if isinstance(field, VLA):
                 field.length = getattr(obj, field.length_field_name)
-                data = read_func(field.length)
+                data = stream_func(field.length)
                 field.from_bytes(data)
             else:
                 from hydration.vectors import _Sequence
@@ -210,10 +214,12 @@ class Struct(metaclass=StructMeta):
                 else:
                     read_size = len(field)
 
-                data = read_func(read_size)
+                data = stream_func(read_size)
                 field.value = field.from_bytes(data).value
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
+
+        return obj
 
     def __getattribute__(self, item):
         """
