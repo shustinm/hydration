@@ -3,7 +3,7 @@ import inspect
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Union, Callable
+from typing import Callable
 
 from .fields import Field, VLA
 
@@ -98,12 +98,14 @@ class Struct(metaclass=StructMeta):
                              'Expected arguments: {} but {} given.'
                              .format(positional_args, len(args)))
 
-        # from_bytes needs the args to create the class
-        # Set from_bytes as a private function
+        # from_bytes and from_stream need the args to create the class, but shouldn't be required by default API
+        # Set the functions as a private function
         self._from_bytes = self.from_bytes
+        self._from_stream = self.from_stream
 
-        # Encapsulate _from_bytes so the arguments are automatically passed without changing from_bytes API
+        # Encapsulate the functions so the arguments are automatically passed without changing from_bytes API
         self.from_bytes = lambda data: self._from_bytes(data, *args)
+        self.from_stream = lambda data: self._from_stream(data, *args)
 
         # Deepcopy the fields so different instances of Struct have unique fields
         for name, field in zip(self._field_names, self._fields):
@@ -149,7 +151,7 @@ class Struct(metaclass=StructMeta):
     @Hook
     def __bytes__(self) -> bytes:
         return self.serialize()
-        
+
     def serialize(self) -> bytes:
         """
         Serialize the Struct object into bytes.
@@ -164,14 +166,15 @@ class Struct(metaclass=StructMeta):
     @classmethod
     def from_bytes(cls, data: bytes, *args):
         """
-        Deserialize raw data to Struct object .
-        :param data: The raw data (bytes).
-        :param args: Arguments for the __init__ of the fields.
-        :return: The deserialized object.
+        Deserialize raw data from bytes into a Struct.
+
+        :param data: The raw data to parse
+        :param args: Arguments for the __init__ of the Struct, if there's any
+        :return The deserialized struct
         """
 
         obj = cls(*args)
-        
+
         for field in obj._fields:
             if isinstance(field, VLA):
                 field.length = getattr(obj, field.length_field_name)
@@ -192,20 +195,23 @@ class Struct(metaclass=StructMeta):
         return obj
 
     @classmethod
-    def from_stream(cls, stream_func: Callable[[int], bytes], *args):
+    def from_stream(cls, read_func: Callable[[int], bytes], *args):
         """
         Deserialize a Struct object from a stream.
-        :param stream_func: The stream reader function.
+
+        :param read_func: The stream's reader function
+        The function needs to receive an int as a positional parameter and return a bytes object.
+
         :param args: Arguments for the __init__ of the fields.
         :return: The deserialized object.
         """
-        
+
         obj = cls(*args)
 
         for field in obj._fields:
             if isinstance(field, VLA):
                 field.length = getattr(obj, field.length_field_name)
-                data = stream_func(field.length)
+                data = read_func(field.length)
                 field.from_bytes(data)
             else:
                 from hydration.vectors import _Sequence
@@ -214,7 +220,7 @@ class Struct(metaclass=StructMeta):
                 else:
                     read_size = len(field)
 
-                data = stream_func(read_size)
+                data = read_func(read_size)
                 field.value = field.from_bytes(data).value
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
