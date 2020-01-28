@@ -1,5 +1,3 @@
-import pytest
-
 import hydration as h
 
 
@@ -25,7 +23,7 @@ class Shine(h.Struct):
 
 def test_vector():
     x = Shine()
-    new_x = x.from_bytes(bytes(x))
+    new_x = Shine.from_bytes(bytes(x))
     assert x == new_x
 
 
@@ -62,10 +60,25 @@ def test_good_validator():
     assert Shustin()
 
 
-@pytest.mark.xfail(condition=True,
-                   reason="Can't call methods on structs because they're returned as values from struct")
 def test_ipv4():
     class Venice(h.Struct):
         ip = h.IPv4()
 
     assert str(Venice().ip) == '0.0.0.0'
+
+
+def test_type_field():
+    class Lior(h.Struct):
+        a = h.Array(5, h.UInt16)
+
+    class Raif(h.Struct):
+        a = h.Array(5, h.UInt16())
+
+    assert Lior().a == Raif().a
+    assert Lior.a == Raif.a
+
+    class Raif(h.Struct):
+        a = h.Array(5, h.UInt16(1))
+
+    assert Lior().a != Raif().a
+    assert Lior.a != Raif.a

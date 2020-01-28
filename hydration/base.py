@@ -4,13 +4,13 @@ import struct
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Union, Callable
+from typing import Callable, List, Iterable
 
+from hydration.helpers import as_obj, as_type
 from .fields import Field, VLA
 
 
 class StructMeta(type):
-    # noinspection PyProtectedMember
     def __new__(mcs, name, bases, attributes):
 
         # Load all the fields from the parent classes
@@ -43,14 +43,16 @@ class StructMeta(type):
                     field_list.append(k)
                     attributes[k] = v
                     continue
-            if isinstance(v, Field):
+
+            if issubclass(as_type(v), Field):
                 field_list.append(k)
-                attributes[k] = v
-                if isinstance(v, VLA):
+                obj = as_obj(v)
+                attributes[k] = obj
+                if isinstance(obj, VLA):
                     # Look for the name of the field which has the VLA's length
                     for attr_name, attr in attributes.items():
-                        if attr is v.length_field_obj:
-                            v.length_field_name = attr_name
+                        if attr is obj.length_field_obj:
+                            obj.length_field_name = attr_name
                             break
                     else:
                         raise RuntimeError('Unable to find id {} for VLA {}'.format(v.length_field_obj, v))
@@ -66,6 +68,9 @@ class StructMeta(type):
 
 
 class Struct(metaclass=StructMeta):
+    __frozen = False
+    _field_names: List[str]
+
     @property
     def value(self):
         return self
@@ -79,9 +84,8 @@ class Struct(metaclass=StructMeta):
         return type(value) == cls
 
     @property
-    def _fields(self):
-        # Use object's getattribute because the Field overrides it
-        return (object.__getattribute__(self, name) for name in self._field_names)
+    def _fields(self) -> Iterable[Field]:
+        return (getattr(self, name) for name in self._field_names)
 
     # noinspection PyArgumentList
     def __init__(self, *args, **kwargs):
@@ -99,15 +103,17 @@ class Struct(metaclass=StructMeta):
                              'Expected arguments: {} but {} given.'
                              .format(positional_args, len(args)))
 
-        # from_bytes needs the args to create the class
-        # Set from_bytes as a private function
+        # from_bytes and from_stream need the args to create the class, but shouldn't be required by default API
+        # Set the functions as a private function
         self._from_bytes = self.from_bytes
+        self._from_stream = self.from_stream
 
-        # Encapsulate _from_bytes so the arguments are automatically passed without changing from_bytes API
+        # Encapsulate the functions so the arguments are automatically passed without changing from_bytes API
         self.from_bytes = lambda data: self._from_bytes(data, *args)
+        self.from_stream = lambda data: self._from_stream(data, *args)
 
         # Deepcopy the fields so different instances of Struct have unique fields
-        for name, field in zip(self._field_names, self._fields):
+        for name, field in self:
             # Validate the values
             with suppress(AttributeError):
                 field.validator.validate(field.value)
@@ -118,14 +124,15 @@ class Struct(metaclass=StructMeta):
 
         for k, v in kwargs.items():
             if k not in self._field_names:
-                raise ValueError('Unexpected kwarg given: {}={}'.format(k, v))
+                raise ValueError('Unexpected keyword argument given: {}={}'.format(k, v))
             setattr(self, k, v)
 
         super().__init__()
+        self.__frozen = True
 
     def __str__(self):
         x = [self.__class__.__qualname__]
-        for name, field in zip(self._field_names, self._fields):
+        for name, field in self:
             if isinstance(field, Struct):
                 x.append('\t{} ({}):'.format(name, field.__class__.__qualname__))
                 x.extend('\t{}'.format(field_str) for field_str in str(field).splitlines()[1:])
@@ -138,11 +145,7 @@ class Struct(metaclass=StructMeta):
 
     def __eq__(self, other) -> bool:
         # noinspection PyProtectedMember
-        # return all(a == b for a, b in zip(self._fields, other._fields))
-        for a, b in zip(self._fields, other._fields):
-            if a != b:
-                return False
-        return True
+        return all(a == b for a, b in zip(self._fields, other._fields))
 
     def __ne__(self, other) -> bool:
         return not self == other
@@ -153,6 +156,14 @@ class Struct(metaclass=StructMeta):
 
     @Hook
     def __bytes__(self) -> bytes:
+        return self.serialize()
+
+    def serialize(self) -> bytes:
+        """
+        Serialize the Struct object into bytes.
+        You may use this function instead of bytes() if you don't want the bytes hook
+        be hooked.
+        """
         try:
             return b''.join(map(bytes, self._fields))
         except struct.error as e:
@@ -162,34 +173,20 @@ class Struct(metaclass=StructMeta):
     post_bytes_hook = postcall_register('__bytes__')
 
     @classmethod
-    def from_bytes(cls, data_or_callable: Union[bytes, Callable[[int], bytes]], *args):
+    def from_bytes(cls, data: bytes, *args):
         """
-        Deserialize raw data to Struct object .
-        :param data_or_callable: The raw data (bytes) or a reader function (used for readers that reads data with known maximum
-        size, like serial reader).
-        :param args: Arguments for the __init__ of the fields.
-        :return: The deserialized object.
+        Deserialize raw data from bytes into a Struct.
+
+        :param data: The raw data to parse
+        :param args: Arguments for the __init__ of the Struct, if there's any
+        :return The deserialized struct
         """
+
         obj = cls(*args)
-        instance_types = {
-            bytes: cls._from_bytes,
-            Callable: cls._from_bytes_reader
-        }
 
-        for instance_type, from_bytes_func in instance_types.items():
-            if isinstance(data_or_callable, instance_type):
-                from_bytes_func(obj, data_or_callable)
-                break
-        else:
-            raise TypeError('Invalid type {type} for from_bytes function'.format(type=type(data_or_callable)))
-
-        return obj
-
-    @staticmethod
-    def _from_bytes(obj, data: bytes):
         for field in obj._fields:
             if isinstance(field, VLA):
-                field.length = getattr(obj, field.length_field_name)
+                field.length = int(getattr(obj, field.length_field_name))
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
@@ -204,11 +201,25 @@ class Struct(metaclass=StructMeta):
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 
-    @staticmethod
-    def _from_bytes_reader(obj, read_func: Callable[[int], bytes]):
+        return obj
+
+    @classmethod
+    def from_stream(cls, read_func: Callable[[int], bytes], *args):
+        """
+        Deserialize a Struct object from a stream.
+
+        :param read_func: The stream's reader function
+        The function needs to receive an int as a positional parameter and return a bytes object.
+
+        :param args: Arguments for the __init__ of the fields.
+        :return: The deserialized object.
+        """
+
+        obj = cls(*args)
+
         for field in obj._fields:
             if isinstance(field, VLA):
-                field.length = getattr(obj, field.length_field_name)
+                field.length = int(getattr(obj, field.length_field_name))
                 data = read_func(field.length)
                 field.from_bytes(data)
             else:
@@ -223,32 +234,24 @@ class Struct(metaclass=StructMeta):
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 
-    def __getattribute__(self, item):
-        """
-        :param item:    The name of the item to get
-        :return:        item's value, unless it's a field. In which case, the field's value
-        """
-        # Use object's getattribute because Field overrides it
-        fields = object.__getattribute__(self, '_field_names')
-        if item in fields:
-            return object.__getattribute__(self, item).value
-        return object.__getattribute__(self, item)
+        return obj
 
-    def __getitem__(self, item):
-        return object.__getattribute__(self, item)
+    def __iter__(self):
+        """
+        :return: Iterator of (name, field) tuples
+        """
+        return zip(self._field_names, self._fields)
 
     def __setattr__(self, key, value):
         """
-        Has standard behavior, except when key references a field. In which case, set the field's value.
-        Also updates length sources of VLAs
+        Only allows setting the field's values. Also updates length sources of VLAs
 
         :param key:     The name of the attribute to set
         :param value:   The value to set
         :return:        None
         """
         if key in self._field_names and not isinstance(value, (Field, StructMeta)):
-            # Use object's getattribute because Field overrides it
-            field = object.__getattribute__(self, key)
+            field = getattr(self, key)
             with suppress(AttributeError):
                 field.validator.validate(value)
             field.value = value
@@ -256,5 +259,7 @@ class Struct(metaclass=StructMeta):
             if isinstance(field, VLA):
                 # Set VLA source to the new length
                 setattr(self, field.length_field_name, len(field))
-        else:
+        elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
+        else:
+            raise AttributeError("Struct doesn't allow defining new attributes")
