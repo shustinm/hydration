@@ -100,3 +100,21 @@ def test_from_stream():
     nadav.bihlal = 38272
     nadav_lo_yazam = NadavLoYazam.from_stream(MockReader(bytes(nadav)).read)
     assert bytes(nadav) == bytes(nadav_lo_yazam)
+
+
+def test_new_attributes():
+    class Becca(h.Struct):
+        x = h.UInt8()
+
+    b = Becca()
+    with pytest.raises(AttributeError):
+        b.y = 3
+
+
+def test_type_field():
+    class Dror(h.Struct):
+        a = h.UInt16
+        b = h.UInt16()
+
+    d = Dror()
+    assert d.a == d.b

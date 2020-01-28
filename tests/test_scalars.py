@@ -19,20 +19,6 @@ class Gilad(h.Struct):
     dub = h.Double(0)
 
 
-def test_field_types():
-    x = Gilad()
-    assert type(x.i8) == int
-    assert type(x.i16) == int
-    assert type(x.i32) == int
-    assert type(x.i64) == int
-    assert type(x.u8) == int
-    assert type(x.u16) == int
-    assert type(x.u32) == int
-    assert type(x.u64) == int
-    assert type(x.flt) == float
-    assert type(x.dub) == float
-
-
 class Guy(enum.IntEnum):
     a = 1
     b = 2
@@ -48,3 +34,8 @@ def test_enums():
     x = Dar()
     x.d = Guy.c
     assert x.from_bytes(bytes(x)).d == Guy.c
+
+
+def test_wrong_size():
+    g = Gilad()
+    assert g.i8 != g.i16

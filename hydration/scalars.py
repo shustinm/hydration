@@ -3,6 +3,7 @@ import struct
 from enum import IntEnum
 from typing import Union, Callable, Type, Optional
 
+from hydration.helpers import as_obj
 from .fields import Field
 from .validators import Validator, FunctionValidator
 
@@ -52,6 +53,84 @@ class Scalar(Field):
 
     def __len__(self) -> int:
         return len(bytes(self))
+
+    def __add__(self, other):
+        if isinstance(other, Field):
+            return self.value + other.value
+        else:
+            return self.value + other
+
+    def __radd__(self, other):
+        return other + self.value
+
+    def __sub__(self, other):
+        if isinstance(other, Field):
+            return self.value - other.value
+        else:
+            return self.value - other
+
+    def __rsub__(self, other):
+        if isinstance(other, Field):
+            return other.value - self.value
+        else:
+            return other - self.value
+
+    def __mul__(self, other):
+        if isinstance(other, Field):
+            return self.value * other.value
+        else:
+            return self.value * other
+
+    def __rmul__(self, other):
+        return other * self.value
+
+    def __truediv__(self, other):
+        if isinstance(other, Field):
+            return self.value / other.value
+        else:
+            return self.value / other
+
+    def __rtruediv__(self, other):
+        if isinstance(other, Field):
+            return other.value / self.value
+        else:
+            return other / self.value
+
+    def __floordiv__(self, other):
+        if isinstance(other, Field):
+            return self.value // other.value
+        else:
+            return self.value // other
+
+    def __rfloordiv__(self, other):
+        if isinstance(other, Field):
+            return other.value // self.value
+        else:
+            return other // self.value
+
+    def __mod__(self, other):
+        if isinstance(other, Field):
+            return self.value % other.value
+        else:
+            return self.value % other
+
+    def __rmod__(self, other):
+        if isinstance(other, Field):
+            return other.value % self.value
+        else:
+            return other % self.value
+
+    def __xor__(self, other):
+        if isinstance(other, Field):
+            return self.value ^ other.value
+        else:
+            return self.value ^ other
+
+    def __rxor__(self, other):
+        if isinstance(other, Field):
+            return other.value ^ self.value
+        else:
+            return other ^ self.value
 
     def __bytes__(self) -> bytes:
         format_string = '{}{}'.format(self.endianness_format,
@@ -139,11 +218,11 @@ class ScalarFormat(enum.Enum):
 
 
 class Enum(Field):
-    def __init__(self, scalar_type: _IntScalar, enum_class: Type[enum.IntEnum], value: Optional[enum.IntEnum] = None):
+    def __init__(self, scalar_type: Union[_IntScalar, Type[_IntScalar]], enum_class: Type[enum.IntEnum], value: Optional[enum.IntEnum] = None):
         super().__init__()
         if scalar_type.value != 0:
             raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
-        self.type = scalar_type
+        self.type = as_obj(scalar_type)
         self.enum_class = enum_class
         # noinspection PyTypeChecker
         self.value = value or next(iter(self.enum_class))

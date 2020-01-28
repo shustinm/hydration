@@ -48,10 +48,13 @@ class Field(abc.ABC):
         raise NotImplementedError
 
     def __eq__(self, other):
-        return self.value == other.value
+        if isinstance(other, Field):
+            return self.value == other.value and len(self) == len(other)
+        else:
+            return self.value == other
 
     def __ne__(self, other):
-        return not self.value == other.value
+        return not self == other
 
 
 class VLA(Field):
@@ -77,7 +80,7 @@ class VLA(Field):
             self.length_field_obj = field
 
     def __len__(self):
-        return self.length
+        return int(self.length)
 
     @property
     def value(self):

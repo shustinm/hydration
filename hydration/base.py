@@ -3,8 +3,9 @@ import inspect
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Callable
+from typing import Callable, List, Iterable
 
+from hydration.helpers import as_obj, as_type
 from .fields import Field, VLA
 
 
@@ -41,14 +42,16 @@ class StructMeta(type):
                     field_list.append(k)
                     attributes[k] = v
                     continue
-            if isinstance(v, Field):
+
+            if issubclass(as_type(v), Field):
                 field_list.append(k)
-                attributes[k] = v
-                if isinstance(v, VLA):
+                obj = as_obj(v)
+                attributes[k] = obj
+                if isinstance(obj, VLA):
                     # Look for the name of the field which has the VLA's length
                     for attr_name, attr in attributes.items():
-                        if attr is v.length_field_obj:
-                            v.length_field_name = attr_name
+                        if attr is obj.length_field_obj:
+                            obj.length_field_name = attr_name
                             break
                     else:
                         raise RuntimeError('Unable to find id {} for VLA {}'.format(v.length_field_obj, v))
@@ -65,6 +68,9 @@ class StructMeta(type):
 
 
 class Struct(metaclass=StructMeta):
+    __frozen = False
+    _field_names: List[str]
+
     @property
     def value(self):
         return self
@@ -78,9 +84,8 @@ class Struct(metaclass=StructMeta):
         return type(value) == cls
 
     @property
-    def _fields(self):
-        # Use object's getattribute because the Field overrides it
-        return (object.__getattribute__(self, name) for name in self._field_names)
+    def _fields(self) -> Iterable[Field]:
+        return (getattr(self, name) for name in self._field_names)
 
     # noinspection PyArgumentList
     def __init__(self, *args, **kwargs):
@@ -108,7 +113,7 @@ class Struct(metaclass=StructMeta):
         self.from_stream = lambda data: self._from_stream(data, *args)
 
         # Deepcopy the fields so different instances of Struct have unique fields
-        for name, field in zip(self._field_names, self._fields):
+        for name, field in self:
             # Validate the values
             with suppress(AttributeError):
                 field.validator.validate(field.value)
@@ -119,14 +124,15 @@ class Struct(metaclass=StructMeta):
 
         for k, v in kwargs.items():
             if k not in self._field_names:
-                raise ValueError('Unexpected kwarg given: {}={}'.format(k, v))
+                raise ValueError('Unexpected keyword argument given: {}={}'.format(k, v))
             setattr(self, k, v)
 
         super().__init__()
+        self.__frozen = True
 
     def __str__(self):
         x = [self.__class__.__qualname__]
-        for name, field in zip(self._field_names, self._fields):
+        for name, field in self:
             if isinstance(field, Struct):
                 x.append('\t{} ({}):'.format(name, field.__class__.__qualname__))
                 x.extend('\t{}'.format(field_str) for field_str in str(field).splitlines()[1:])
@@ -139,11 +145,7 @@ class Struct(metaclass=StructMeta):
 
     def __eq__(self, other) -> bool:
         # noinspection PyProtectedMember
-        # return all(a == b for a, b in zip(self._fields, other._fields))
-        for a, b in zip(self._fields, other._fields):
-            if a != b:
-                return False
-        return True
+        return all(a == b for a, b in zip(self._fields, other._fields))
 
     def __ne__(self, other) -> bool:
         return not self == other
@@ -177,7 +179,7 @@ class Struct(metaclass=StructMeta):
 
         for field in obj._fields:
             if isinstance(field, VLA):
-                field.length = getattr(obj, field.length_field_name)
+                field.length = int(getattr(obj, field.length_field_name))
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
@@ -210,7 +212,7 @@ class Struct(metaclass=StructMeta):
 
         for field in obj._fields:
             if isinstance(field, VLA):
-                field.length = getattr(obj, field.length_field_name)
+                field.length = int(getattr(obj, field.length_field_name))
                 data = read_func(field.length)
                 field.from_bytes(data)
             else:
@@ -227,29 +229,22 @@ class Struct(metaclass=StructMeta):
 
         return obj
 
-    def __getattribute__(self, item):
+    def __iter__(self):
         """
-        :param item:    The name of the item to get
-        :return:        item's value, unless it's a field. In which case, the field's value
+        :return: Iterator of (name, field) tuples
         """
-        # Use object's getattribute because Field overrides it
-        fields = object.__getattribute__(self, '_field_names')
-        if item in fields:
-            return object.__getattribute__(self, item).value
-        return object.__getattribute__(self, item)
+        return zip(self._field_names, self._fields)
 
     def __setattr__(self, key, value):
         """
-        Has standard behavior, except when key references a field. In which case, set the field's value.
-        Also updates length sources of VLAs
+        Only allows setting the field's values. Also updates length sources of VLAs
 
         :param key:     The name of the attribute to set
         :param value:   The value to set
         :return:        None
         """
         if key in self._field_names and not isinstance(value, (Field, StructMeta)):
-            # Use object's getattribute because Field overrides it
-            field = object.__getattribute__(self, key)
+            field = getattr(self, key)
             with suppress(AttributeError):
                 field.validator.validate(value)
             field.value = value
@@ -257,5 +252,7 @@ class Struct(metaclass=StructMeta):
             if isinstance(field, VLA):
                 # Set VLA source to the new length
                 setattr(self, field.length_field_name, len(field))
-        else:
+        elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
+        else:
+            raise AttributeError("Struct doesn't allow defining new attributes")
