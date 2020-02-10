@@ -152,7 +152,7 @@ class Struct(metaclass=StructMeta):
 
     def __truediv__(self, other):
         from .message import Message
-        return Message((self, other))
+        return Message(self, other)
 
     @Hook
     def __bytes__(self) -> bytes:

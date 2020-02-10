@@ -1,16 +1,13 @@
-from .base import Struct, StructMeta
+import inspect
+from contextlib import suppress
+
+from .base import Struct
 from .fields import Field
-from typing import Optional, Union, Iterable
 
 try:
     from typing import Protocol, runtime_checkable
 except ImportError:
     from typing_extensions import Protocol, runtime_checkable
-
-
-@runtime_checkable
-class NamedStruct(Protocol):
-    call_name: str
 
 
 @runtime_checkable
@@ -29,27 +26,31 @@ class Opcoded(Protocol):
 
 
 class Message:
-    def __init__(self, layers: Optional[Iterable[Union[Struct, bytes]]] = ()):
-        self.unparsed_data = b''
-
-        if not isinstance(layers, Iterable):
-            layers_to_append = (layers,)
-        else:
-            layers_to_append = layers
+    def __init__(self, *layers, update_metadata: bool = True):
 
         self.layers = []
-        for layer in layers_to_append:
-            if not isinstance(layer, (Struct, Message, bytes)):
-                raise TypeError('Invalid type given: {}, expected: Struct or bytes'.format(type(layer), ))
-            self.layers.append(layer)
-            self._add_name_of_layer(layer)
+        for layer in layers:
+            # Messages are flat, they will not contain other messages, so just add its' layers
+            if isinstance(layer, Message):
+                self.layers.extend(layer.layers)
+                continue
+            # Check if we're appending bytes
+            elif isinstance(layer, bytes):
+                # If the last layer is already bytes, change it instead
+                if isinstance(self.layers[-1], bytes):
+                    self.layers[-1] += layer
+                    continue
+            elif not isinstance(layer, Struct):
+                raise TypeError('Invalid type given: {}, expected: Message, Struct, or bytes'.format(type(layer), ))
 
-        self._update_metas()
+            self.layers.append(layer)
+
+        if update_metadata:
+            self._update_metas()
 
     def serialize(self):
         return b''.join(bytes(layer) for layer in self.layers)
 
-    # noinspection PyProtectedMember
     def _update_metas(self):
         """
         Iterate from the penultimate (1 before the last) layer to the first layer,
@@ -61,15 +62,9 @@ class Message:
             if isinstance(layer, HeaderWithOpcode) and isinstance(child, Opcoded):
                 layer.body_opcode = child.opcode
 
-    def _add_name_of_layer(self, layer):
-        if isinstance(layer, NamedStruct):
-            if hasattr(self, layer.call_name):
-                raise NameError('Message {} already has a layer named {}'.format(self, layer.call_name))
-            setattr(self, layer.call_name, layer)
-
     def __eq__(self, other):
         if isinstance(other, Message):
-            return all(l1 == l2 for l1, l2 in zip(self.layers, other.layers))
+            return all(l1 == l2 for l1, l2 in zip(self, other))
         return False
 
     def __bytes__(self):
@@ -79,8 +74,11 @@ class Message:
         # __str__ every layer and insert a line between each layer
         return '\n{}\n'.format('-' * 10).join(str(layer) for layer in self.layers)
 
+    def __add__(self, other):
+        return Message(self, other)
+
     def __truediv__(self, other):
-        return Message((self, other))
+        return Message(self, other)
 
     def __iter__(self):
         return iter(self.layers)
@@ -88,18 +86,33 @@ class Message:
     def __getitem__(self, item):
         if isinstance(item, int):
             return self.layers[item]
-        elif isinstance(item, type) and issubclass(item, Struct):
-            for layer in self.layers:
-                if isinstance(layer, item):
+
+        if inspect.isclass(item):
+            occurrence_to_find = 0
+        elif isinstance(item, tuple):
+            item, occurrence_to_find = item
+        else:
+            raise TypeError
+
+        occurrences = 0
+        for layer in self.layers:
+            if isinstance(layer, item):
+                if occurrence_to_find == occurrences:
                     return layer
-        elif isinstance(item, str):
-            for layer in filter(lambda l: isinstance(l, NamedStruct), self.layers):
-                if layer.call_name == item:
-                    return layer
-        raise KeyError
+                else:
+                    occurrences += 1
+
+        if occurrences == 0:
+            raise KeyError(f"Couldn't find any layer that's an instance of {item}")
+        else:
+            raise KeyError(f"Found only {occurrences + 1} occurrences of {item}, "
+                           f"but expected to find at least {occurrence_to_find + 1}")
 
     def __contains__(self, item):
-        return bool(self[item])
+        with suppress(KeyError):
+            return bool(self[item])
+
+        return item in self.layers
 
     def __len__(self):
         return sum(map(len, self.layers))
