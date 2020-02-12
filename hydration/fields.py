@@ -16,6 +16,10 @@ class Field(abc.ABC):
     def validator(self, value):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def validate(self, value):
+        raise NotImplementedError
+
     @property
     @abc.abstractmethod
     def value(self):

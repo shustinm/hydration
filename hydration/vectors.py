@@ -1,5 +1,6 @@
 import copy
 from abc import ABC
+from contextlib import suppress
 from typing import Sequence, Optional, Union, Any, Type
 from itertools import islice, chain
 
@@ -15,8 +16,8 @@ class _Sequence(Field, ABC):
                  value: Sequence[Any] = (),
                  validator: Optional[Validator] = None):
         self.type = as_obj(field_type)
-        self.validator = validator
         self.value = value
+        self.validator = validator
 
     @property
     def validator(self) -> Validator:
@@ -25,6 +26,11 @@ class _Sequence(Field, ABC):
     @validator.setter
     def validator(self, value: Validator):
         self._validator = SequenceValidator(value)
+        self.validate(self.value)
+
+    def validate(self, value):
+        with suppress(AttributeError):
+            self._validator.validate(value)
 
     @property
     def value(self):
@@ -32,6 +38,7 @@ class _Sequence(Field, ABC):
 
     @value.setter
     def value(self, value):
+        self.validate(value)
         self._value = value
 
     def __bytes__(self) -> bytes:
@@ -82,8 +89,9 @@ class Array(_Sequence):
 
         # Extend with the value of the default field value to fill the length (this tuple might be empty)
         extension = (self.type.value,) * (len(self) - len(value))
-
-        self._value = tuple(chain(value, extension))
+        new_value = tuple(chain(value, extension))
+        self.validate(new_value)
+        self._value = new_value
 
     def __len__(self) -> int:
         return self.length
@@ -102,6 +110,8 @@ class Vector(_Sequence, VLA):
     # noinspection PyAttributeOutsideInit
     @_Sequence.value.setter
     def value(self, value):
+        self.validate(value)
+
         # Convert value to a mutable list and set
         self._value = value
 
@@ -133,7 +143,9 @@ class IPv4(Array):
         x = value.split('.')
         if len(x) != 4:
             raise ValueError('IP length mismatch. Expected 4, got {}'.format(len(x)))
-        self._value = tuple(int(z) for z in x)
+        new_value = tuple(int(z) for z in x)
+        self.validate(new_value)
+        self._value = new_value
 
     def __str__(self):
         return '.'.join(str(self.value))

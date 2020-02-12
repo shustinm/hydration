@@ -1,7 +1,8 @@
 import enum
 import struct
+from contextlib import suppress
 from enum import IntEnum
-from typing import Union, Callable, Type, Optional
+from typing import Union, Callable, Type, Optional, Dict, Iterable
 
 from hydration.helpers import as_obj
 from .fields import Field
@@ -22,8 +23,8 @@ class Scalar(Field):
     def __init__(self, value: scalar_values, endianness: Endianness, validator: Optional[Validator] = None):
         self.endianness_format = endianness.value if endianness else ''
         self.scalar_format = ScalarFormat(self.__class__).name
-        self.validator = validator
         self.value = value
+        self.validator = validator
 
     @property
     def validator(self) -> Validator:
@@ -32,6 +33,11 @@ class Scalar(Field):
     @validator.setter
     def validator(self, value: Validator):
         self._validator = value
+        self.validate(self.value)
+
+    def validate(self, value):
+        with suppress(AttributeError):
+            self._validator.validate(value)
 
     @property
     def value(self):
@@ -43,6 +49,8 @@ class Scalar(Field):
             struct.pack(self.scalar_format, value)
         except struct.error as e:
             raise ValueError('Value {} is invalid for field type {}: {}'.format(value, self.__class__.__qualname__, e))
+
+        self.validate(value)
         self._value = value
 
     def __repr__(self):
@@ -232,6 +240,10 @@ class Enum(Field):
     def validator(self) -> Validator:
         return FunctionValidator(lambda x: x in (m.value for m in self.enum_class))
 
+    def validate(self, value):
+        # There is no need for this function in Enum, the validator can not be changed
+        raise NotImplementedError
+
     @property
     def value(self):
         return self._value
@@ -260,4 +272,3 @@ class Enum(Field):
         self.type.from_bytes(data)
         self.value = self.type.value
         return self
-
