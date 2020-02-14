@@ -3,18 +3,17 @@ from abc import ABC
 from typing import Sequence, Optional, Union, Any, Type
 from itertools import islice, chain
 
-from hydration.helpers import as_type, as_obj
-from . import Struct
-from .fields import Field, VLA
+from .base import Struct
+from .fields import Field, VLA, TypeDependentLengthField
 from .scalars import _IntScalar, UInt8
 from .validators import Validator, SequenceValidator
 
 
-class _Sequence(Field, ABC):
+class _Sequence(TypeDependentLengthField, ABC):
     def __init__(self, field_type: Union[Field, Struct, Type[Field], Type[Struct]],
                  value: Sequence[Any] = (),
                  validator: Optional[Validator] = None):
-        self.type = as_obj(field_type)
+        super().__init__(field_type)
         self.validator = validator
         self.value = value
 

@@ -1,34 +1,17 @@
 import inspect
+from abc import ABC, abstractmethod
 from contextlib import suppress
+from typing import List
 
 from .base import Struct
 from .fields import Field
-
-try:
-    from typing import Protocol, runtime_checkable
-except ImportError:
-    from typing_extensions import Protocol, runtime_checkable
-
-
-@runtime_checkable
-class HeaderWithLen(Protocol):
-    body_len: Field
-
-
-@runtime_checkable
-class HeaderWithOpcode(Protocol):
-    body_opcode: Field
-
-
-@runtime_checkable
-class Opcoded(Protocol):
-    opcode: int
+from .validators import Validator
 
 
 class Message:
     def __init__(self, *layers, update_metadata: bool = True):
 
-        self.layers = []
+        self.layers: List[Struct] = []
         for layer in layers:
             # Messages are flat, they will not contain other messages, so just add its' layers
             if isinstance(layer, Message):
@@ -53,14 +36,15 @@ class Message:
 
     def _update_metas(self):
         """
-        Iterate from the penultimate (1 before the last) layer to the first layer,
-        and update struct data according to protocols
+        Iterate over the layers in reversed order, and update all their MetaFields
         """
-        for layer, child in zip(self.layers[-2::-1], self.layers[::-1]):
-            if isinstance(layer, HeaderWithLen):
-                layer.body_len = len(child)
-            if isinstance(layer, HeaderWithOpcode) and isinstance(child, Opcoded):
-                layer.body_opcode = child.opcode
+        for layer in reversed(self.layers):
+            if isinstance(layer, bytes):
+                continue
+
+            for _, field in layer:
+                if isinstance(field, MetaField):
+                    field.update(self, layer)
 
     def __eq__(self, other):
         if isinstance(other, Message):
@@ -116,3 +100,52 @@ class Message:
 
     def __len__(self):
         return sum(map(len, self.layers))
+
+
+class MetaField(Field, ABC):
+    """
+    A Field that contains metadata (data about the message)
+    """
+
+    def __init__(self, data_field: Field):
+        self.data_field = data_field
+
+    @property
+    def validator(self) -> Validator:
+        return self.data_field.validator
+
+    @validator.setter
+    def validator(self, value):
+        self.data_field.validator = value
+
+    @property
+    def value(self):
+        return self.data_field.value
+
+    @value.setter
+    def value(self, value):
+        self.data_field.value = value
+
+    def __repr__(self) -> str:
+        return repr(self.data_field)
+
+    def __str__(self) -> str:
+        return str(self.data_field)
+
+    def __len__(self) -> int:
+        return len(self.data_field)
+
+    def __bytes__(self) -> bytes:
+        return bytes(self.data_field)
+
+    def from_bytes(self, data: bytes):
+        return self.data_field.from_bytes(data)
+
+    @abstractmethod
+    def update(self, message: Message, struct: Struct):
+        raise NotImplementedError
+
+
+class InclusiveLengthField(MetaField):
+    def update(self, message: Message, struct: Struct):
+        self.value = len(message)

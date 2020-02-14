@@ -7,7 +7,7 @@ from pyhooks import Hook, precall_register, postcall_register
 from typing import Callable, List, Iterable
 
 from hydration.helpers import as_obj, as_type
-from .fields import Field, VLA
+from .fields import Field, VLA, TypeDependentLengthField
 
 
 class StructMeta(type):
@@ -190,8 +190,7 @@ class Struct(metaclass=StructMeta):
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
-                from hydration.vectors import _Sequence
-                if isinstance(field, _Sequence):
+                if isinstance(field, TypeDependentLengthField):
                     split_index = len(field) * len(field.type)
                 else:
                     split_index = len(field)
@@ -223,8 +222,7 @@ class Struct(metaclass=StructMeta):
                 data = read_func(field.length)
                 field.from_bytes(data)
             else:
-                from hydration.vectors import _Sequence
-                if isinstance(field, _Sequence):
+                if isinstance(field, TypeDependentLengthField):
                     read_size = len(field) * len(field.type)
                 else:
                     read_size = len(field)

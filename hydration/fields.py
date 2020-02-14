@@ -1,10 +1,12 @@
 import abc
+from abc import ABC
 from typing import Union
 
+from hydration.helpers import as_obj
 from .validators import Validator
 
 
-class Field(abc.ABC):
+class Field(ABC):
 
     @property
     @abc.abstractmethod
@@ -42,9 +44,8 @@ class Field(abc.ABC):
     def __bytes__(self) -> bytes:
         raise NotImplementedError
 
-    @classmethod
     @abc.abstractmethod
-    def from_bytes(cls, data: bytes):
+    def from_bytes(self, data: bytes):
         raise NotImplementedError
 
     def __eq__(self, other):
@@ -57,7 +58,7 @@ class Field(abc.ABC):
         return not self == other
 
 
-class VLA(Field):
+class VLA(Field, ABC):
     """
     Used for fields that have variable length, their length parameter is stored in another field.
     """
@@ -82,22 +83,8 @@ class VLA(Field):
     def __len__(self):
         return int(self.length)
 
-    @property
-    def value(self):
-        raise NotImplementedError
 
-    @value.setter
-    def value(self, value):
-        raise NotImplementedError
+class TypeDependentLengthField(Field, ABC):
 
-    def __repr__(self) -> str:
-        raise NotImplementedError
-
-    def __str__(self) -> str:
-        raise NotImplementedError
-
-    def __bytes__(self) -> bytes:
-        raise NotImplementedError
-
-    def from_bytes(self, data: bytes):
-        raise NotImplementedError
+    def __init__(self, field_type):
+        self.type = as_obj(field_type)
