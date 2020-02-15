@@ -1,20 +1,19 @@
 import copy
 from abc import ABC
-from typing import Sequence, Optional, Union, Any, Type
+from typing import Sequence, Optional, Any
 from itertools import islice, chain
 
-from hydration.helpers import as_type, as_obj
-from . import Struct
-from .fields import Field, VLA
+from hydration.message import FieldType
+from .fields import Field, VLA, TypeDependentLengthField
 from .scalars import _IntScalar, UInt8
 from .validators import Validator, SequenceValidator
 
 
-class _Sequence(Field, ABC):
-    def __init__(self, field_type: Union[Field, Struct, Type[Field], Type[Struct]],
+class _Sequence(TypeDependentLengthField, ABC):
+    def __init__(self, field_type: FieldType,
                  value: Sequence[Any] = (),
                  validator: Optional[Validator] = None):
-        self.type = as_obj(field_type)
+        super().__init__(field_type)
         self.validator = validator
         self.value = value
 
@@ -65,7 +64,7 @@ class _Sequence(Field, ABC):
 
 class Array(_Sequence):
     def __init__(self, length: int,
-                 field_type: Union[Field, Struct, Type[Field], Type[Struct]] = UInt8,
+                 field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
                  validator: Optional[Validator] = None):
         self.length = length
@@ -92,7 +91,7 @@ class Array(_Sequence):
 class Vector(_Sequence, VLA):
 
     def __init__(self, length: _IntScalar,
-                 field_type: Union[Field, Struct, Type[Field], Type[Struct]] = UInt8,
+                 field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
                  validator: Optional[Validator] = None):
         VLA.__init__(self, length)
@@ -136,7 +135,7 @@ class IPv4(Array):
         self._value = tuple(int(z) for z in x)
 
     def __str__(self):
-        return '.'.join(str(self.value))
+        return '.'.join(str(x) for x in self.value)
 
 
 def byte_chunks(x: bytes, chunk_size: int):

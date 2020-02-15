@@ -1,12 +1,13 @@
 import copy
 import inspect
+import struct
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
 from typing import Callable, List, Iterable
 
 from hydration.helpers import as_obj, as_type
-from .fields import Field, VLA
+from .fields import Field, VLA, TypeDependentLengthField
 
 
 class StructMeta(type):
@@ -58,8 +59,10 @@ class StructMeta(type):
 
         # Also save as attribute so it can be used to iterate over the fields in order
         attributes['_field_names'] = field_list
-
         return super().__new__(mcs, name, bases, attributes)
+
+    def __len__(self):
+        return len(self())
 
     @classmethod
     def __prepare__(mcs, name, bases):
@@ -150,6 +153,10 @@ class Struct(metaclass=StructMeta):
     def __ne__(self, other) -> bool:
         return not self == other
 
+    def __truediv__(self, other):
+        from .message import Message
+        return Message(self, other)
+
     @Hook
     def __bytes__(self) -> bytes:
         return self.serialize()
@@ -160,7 +167,10 @@ class Struct(metaclass=StructMeta):
         You may use this function instead of bytes() if you don't want the bytes hook
         be hooked.
         """
-        return b''.join(map(bytes, self._fields))
+        try:
+            return b''.join(map(bytes, self._fields))
+        except struct.error as e:
+            raise ValueError(str(e))
 
     pre_bytes_hook = precall_register('__bytes__')
     post_bytes_hook = postcall_register('__bytes__')
@@ -183,8 +193,7 @@ class Struct(metaclass=StructMeta):
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
-                from hydration.vectors import _Sequence
-                if isinstance(field, _Sequence):
+                if isinstance(field, TypeDependentLengthField):
                     split_index = len(field) * len(field.type)
                 else:
                     split_index = len(field)
@@ -216,8 +225,7 @@ class Struct(metaclass=StructMeta):
                 data = read_func(field.length)
                 field.from_bytes(data)
             else:
-                from hydration.vectors import _Sequence
-                if isinstance(field, _Sequence):
+                if isinstance(field, TypeDependentLengthField):
                     read_size = len(field) * len(field.type)
                 else:
                     read_size = len(field)
@@ -237,7 +245,7 @@ class Struct(metaclass=StructMeta):
 
     def __setattr__(self, key, value):
         """
-        Only allows setting the field's values. Also updates length sources of VLAs
+        Only allows setting the field's values. Also updates length sources of VLAs and updates MetaFields
 
         :param key:     The name of the attribute to set
         :param value:   The value to set

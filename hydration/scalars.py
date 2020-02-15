@@ -207,7 +207,7 @@ class Double(_FloatScalar):
 class ScalarFormat(enum.Enum):
     B = UInt8
     H = UInt16
-    I = UInt32
+    I = UInt32  # noqa
     Q = UInt64
     b = Int8
     h = Int16
@@ -218,7 +218,9 @@ class ScalarFormat(enum.Enum):
 
 
 class Enum(Field):
-    def __init__(self, scalar_type: Union[_IntScalar, Type[_IntScalar]], enum_class: Type[enum.IntEnum], value: Optional[enum.IntEnum] = None):
+    def __init__(self, scalar_type: Union[_IntScalar, Type[_IntScalar]],
+                 enum_class: Type[enum.IntEnum],
+                 value: Optional[enum.IntEnum] = None):
         super().__init__()
         if scalar_type.value != 0:
             raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
@@ -260,4 +262,3 @@ class Enum(Field):
         self.type.from_bytes(data)
         self.value = self.type.value
         return self
-

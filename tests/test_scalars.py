@@ -1,7 +1,6 @@
 import enum
 
 import hydration as h
-import pytest
 
 
 class Gilad(h.Struct):
