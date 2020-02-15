@@ -61,6 +61,9 @@ class StructMeta(type):
         attributes['_field_names'] = field_list
         return super().__new__(mcs, name, bases, attributes)
 
+    def __len__(self):
+        return len(self())
+
     @classmethod
     def __prepare__(mcs, name, bases):
         # Attributes need to be iterated in order of definition
@@ -242,7 +245,7 @@ class Struct(metaclass=StructMeta):
 
     def __setattr__(self, key, value):
         """
-        Only allows setting the field's values. Also updates length sources of VLAs
+        Only allows setting the field's values. Also updates length sources of VLAs and updates MetaFields
 
         :param key:     The name of the attribute to set
         :param value:   The value to set

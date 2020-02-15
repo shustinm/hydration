@@ -1,16 +1,16 @@
 import copy
 from abc import ABC
-from typing import Sequence, Optional, Union, Any, Type
+from typing import Sequence, Optional, Any
 from itertools import islice, chain
 
-from .base import Struct
+from hydration.message import FieldType
 from .fields import Field, VLA, TypeDependentLengthField
 from .scalars import _IntScalar, UInt8
 from .validators import Validator, SequenceValidator
 
 
 class _Sequence(TypeDependentLengthField, ABC):
-    def __init__(self, field_type: Union[Field, Struct, Type[Field], Type[Struct]],
+    def __init__(self, field_type: FieldType,
                  value: Sequence[Any] = (),
                  validator: Optional[Validator] = None):
         super().__init__(field_type)
@@ -64,7 +64,7 @@ class _Sequence(TypeDependentLengthField, ABC):
 
 class Array(_Sequence):
     def __init__(self, length: int,
-                 field_type: Union[Field, Struct, Type[Field], Type[Struct]] = UInt8,
+                 field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
                  validator: Optional[Validator] = None):
         self.length = length
@@ -91,7 +91,7 @@ class Array(_Sequence):
 class Vector(_Sequence, VLA):
 
     def __init__(self, length: _IntScalar,
-                 field_type: Union[Field, Struct, Type[Field], Type[Struct]] = UInt8,
+                 field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
                  validator: Optional[Validator] = None):
         VLA.__init__(self, length)

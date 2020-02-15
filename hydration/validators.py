@@ -29,7 +29,7 @@ class RangeValidator(Validator):
 class ExactValueValidator(Validator):
     def __init__(self, value: Any):
         self.value = value
-        
+
     def validate(self, value: Any) -> None:
         if not self.value == value:
             raise ValueError('Given value {} is not equal to {}'.format(value, self.value))

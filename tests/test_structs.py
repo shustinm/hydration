@@ -8,6 +8,11 @@ class Omri(h.Struct):
     c = h.Double(3)
 
 
+def test_struct_meta_len():
+    # noinspection PyTypeChecker
+    assert len(Omri()) == len(Omri)
+
+
 def test_field_copy():
     x = Omri()
     x.a = 3
