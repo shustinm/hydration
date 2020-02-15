@@ -1,6 +1,6 @@
 import copy
 from abc import ABC
-from typing import Sequence, Optional, Any
+from typing import Sequence, Optional, Any, Union
 from itertools import islice, chain
 
 from hydration.message import FieldType
@@ -90,7 +90,7 @@ class Array(_Sequence):
 
 class Vector(_Sequence, VLA):
 
-    def __init__(self, length: _IntScalar,
+    def __init__(self, length: Union[_IntScalar, str],
                  field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
                  validator: Optional[Validator] = None):

@@ -28,18 +28,49 @@ def test_associativity():
 
 def test_length_fields():
     class A(h.Struct):
-        a = h.UInt16()
+        a = h.UInt16
         length_field = h.ExclusiveLengthField(h.UInt16)
 
     class B(h.Struct):
-        a = h.UInt16()
+        a = h.UInt16
         length_field = h.InclusiveLengthField(h.UInt16)
 
     class C(h.Struct):
         x = h.Array(5)
+        y = h.UInt8
 
-    msg = A() / B() / C()
+    class D(h.Struct):
+        v = h.Vector('y')
 
-    msg[B].a = 3
+    msg = A() / B()
+
+    assert msg[A].length_field == msg[B].length_field == len(B())
+
+    msg /= C()
 
     assert msg[A].length_field == msg[B].length_field == len(B()) + len(C())
+
+    the_d = D(v=[1, 2, 3])
+    msg /= the_d
+
+    assert msg[A].length_field == msg[B].length_field == len(B()) + len(C()) + len(the_d)
+
+
+def test_opcode_field():
+
+    class B1(h.Struct):
+        data = h.UInt8
+
+    class B2(h.Struct):
+        pass
+
+    opcodes = {
+        B1: 1,
+        B2: 2
+    }
+
+    class A(h.Struct):
+        opcode = h.OpcodeField(h.UInt8, opcodes)
+
+    assert (A() / B1())[A].opcode == 1
+    assert (A() / B2())[A].opcode == 2

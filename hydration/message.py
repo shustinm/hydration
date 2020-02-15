@@ -169,3 +169,12 @@ class InclusiveLengthField(MetaField):
 class ExclusiveLengthField(MetaField):
     def update(self, message: Message, struct: Struct, struct_index: int):
         self.value = len(message[struct_index + 1:])
+
+
+class OpcodeField(MetaField):
+    def __init__(self, data_field: FieldType, opcode_dictionary: dict):
+        super().__init__(data_field)
+        self.opcode_dictionary = opcode_dictionary
+
+    def update(self, message: Message, struct: Struct, struct_index: int):
+        self.value = self.opcode_dictionary[type(message[struct_index + 1])]

@@ -48,7 +48,7 @@ class StructMeta(type):
                 field_list.append(k)
                 obj = as_obj(v)
                 attributes[k] = obj
-                if isinstance(obj, VLA):
+                if isinstance(obj, VLA) and not obj.length_field_name:
                     # Look for the name of the field which has the VLA's length
                     for attr_name, attr in attributes.items():
                         if attr is obj.length_field_obj:
