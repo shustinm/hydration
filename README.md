@@ -7,6 +7,7 @@ This software has been designed for you, with much joy, by <a href="http://githu
 </p>
 
 ---
+## Introduction
 <p>&nbsp;</p>
 Hydration allows you to define python objects that can be converted to (and from) binary data.
 <p>&nbsp;</p>
