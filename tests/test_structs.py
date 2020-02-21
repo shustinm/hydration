@@ -55,8 +55,7 @@ class MyStructHeader(h.Struct):
     a = h.UInt8(1)
 
 
-class MyStructFooter(h.Struct):
-    _footer = True
+class MyStructFooter(h.Struct, footer=True):
     d = h.UInt8(4)
 
 

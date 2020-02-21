@@ -4,18 +4,21 @@ import struct
 from collections import OrderedDict
 from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
-from typing import Callable, List, Iterable
+from typing import Callable, List, Iterable, Optional
 
-from hydration.helpers import as_obj, as_type
+from .helpers import as_obj, as_type
+from .scalars import Scalar
 from .fields import Field, VLA, TypeDependentLengthField
+from .endianness import Endianness
 
 
 class StructMeta(type):
-    def __new__(mcs, name, bases, attributes):
+    # noinspection PyProtectedMember
+    def __new__(mcs, name, bases, attributes, endianness: Optional[Endianness] = None, footer: Optional[bool] = False):
 
         # Load all the fields from the parent classes
-        base_fields = OrderedDict()
-        footer_fields = OrderedDict()
+        base_fields = OrderedDict()  # Contains all the 'regular' fields
+        footer_fields = OrderedDict()  # Similar to the 'regular' fields, but they will be appended in the end
         for base in filter(lambda x: issubclass(x, Struct), bases):
             for field_name in base._field_names:
                 if hasattr(base, '_footer') and base._footer:
@@ -24,30 +27,39 @@ class StructMeta(type):
                     base_fields[field_name] = getattr(base, field_name)
 
         # Check to see if any of the current attributes have already been defined
-        for k in attributes.keys():
-            if k in base_fields or k in footer_fields:
-                raise NameError("Field '{}' was defined more than once".format(k))
+        for field_name in attributes.keys():
+            if field_name in base_fields or field_name in footer_fields:
+                raise NameError("Field '{}' was defined more than once".format(field_name))
 
         # Update the current attributes with the fields from the parents (in order)
         base_fields.update(attributes)
         base_fields.update(footer_fields)
         attributes = base_fields
 
-        # Create the list of the final fields and set the new attributes accordingly
+        # Save some metadata in private members
+        # List of the parent classes of the class
         attributes['_bases'] = list(base.__qualname__ for base in bases)
-        field_list = []
-        for k, v in attributes.items():
+        # Whether the Struct is a footer or not, used to determine order of attributes in child classes
+        attributes['_footer'] = footer
+
+        # Create the list of the final fields and set them as attributes
+        field_names = []
+        for field_name, field_obj in attributes.items():
             with suppress(AttributeError):
-                if 'Struct' in v._bases:
-                    # This field is a nested struct
-                    field_list.append(k)
-                    attributes[k] = v
+                # Check if the field_obj inherits from Struct, and is NOT actually `Struct` class
+                if 'Struct' in field_obj._bases:
+                    # This field_obj will be treated as a nested struct
+                    field_names.append(field_name)
+                    attributes[field_name] = field_obj
                     continue
 
-            if issubclass(as_type(v), Field):
-                field_list.append(k)
-                obj = as_obj(v)
-                attributes[k] = obj
+            # Check if the field_obj is a Field, can't handle much else...
+            if issubclass(as_type(field_obj), Field):
+                field_names.append(field_name)
+                obj = as_obj(field_obj)
+                attributes[field_name] = obj
+
+                # VLA fields require care - the Struct must resolve the VLA's length field name (if not already given)
                 if isinstance(obj, VLA) and not obj.length_field_name:
                     # Look for the name of the field which has the VLA's length
                     for attr_name, attr in attributes.items():
@@ -55,17 +67,23 @@ class StructMeta(type):
                             obj.length_field_name = attr_name
                             break
                     else:
-                        raise RuntimeError('Unable to find id {} for VLA {}'.format(v.length_field_obj, v))
+                        raise RuntimeError('Unable to find field {} for VLA {}'.format(field_obj.length_field_obj,
+                                                                                       field_obj))
+                # If endianness was given, change endianness (only if it's default)
+                if isinstance(obj, Scalar) and endianness:
+                    # Check if the endianness_format was not already set
+                    if not obj.endianness_format:
+                        obj.endianness_format = endianness
 
-        # Also save as attribute so it can be used to iterate over the fields in order
-        attributes['_field_names'] = field_list
+        # Save field names as an attribute, used to iterate over the fields (in order)
+        attributes['_field_names'] = field_names
         return super().__new__(mcs, name, bases, attributes)
 
     def __len__(self):
         return len(self())
 
     @classmethod
-    def __prepare__(mcs, name, bases):
+    def __prepare__(mcs, name, bases, *args, **kwargs):
         # Attributes need to be iterated in order of definition
         return OrderedDict()
 

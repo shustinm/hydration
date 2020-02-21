@@ -3,27 +3,32 @@ import struct
 from enum import IntEnum
 from typing import Union, Callable, Type, Optional
 
-from hydration.helpers import as_obj
+from .settings import Settings
+from .endianness import Endianness
+from .helpers import as_obj
 from .fields import Field
 from .validators import Validator, FunctionValidator
 
 scalar_values = Union[int, float]
 
 
-class Endianness(enum.Enum):
-    Network = '!'
-    NativeEndian = '='
-    LittleEndian = '<'
-    BigEndian = '>'
-
-
 class Scalar(Field):
 
-    def __init__(self, value: scalar_values, endianness: Endianness, validator: Optional[Validator] = None):
-        self.endianness_format = endianness.value if endianness else ''
+    def __init__(self, value: scalar_values,
+                 endianness: Optional[Endianness] = None,
+                 validator: Optional[Validator] = None):
+        self._endianness_format = endianness.value if endianness else None
         self.scalar_format = ScalarFormat(self.__class__).name
         self.validator = validator
         self.value = value
+
+    @property
+    def endianness_format(self):
+        return self._endianness_format or Settings.DefaultEndianness.value
+
+    @endianness_format.setter
+    def endianness_format(self, value: Endianness):
+        self._endianness_format = value.value
 
     @property
     def validator(self) -> Validator:
