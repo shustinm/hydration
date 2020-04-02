@@ -7,7 +7,6 @@ This software has been designed for you, with much joy, by <a href="http://githu
 </p>
 
 ---
-<p>&nbsp;</p>
 
 # What is Hydration?
 Hydration is a library used to define python objects that can be converted to (and from) bytes.
