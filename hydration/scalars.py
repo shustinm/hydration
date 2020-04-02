@@ -7,7 +7,7 @@ from .settings import Settings
 from .endianness import Endianness
 from .helpers import as_obj
 from .fields import Field
-from .validators import Validator, FunctionValidator
+from .validators import Validator, FunctionValidator, ValidatorType, as_validator
 
 scalar_values = Union[int, float]
 
@@ -16,10 +16,10 @@ class Scalar(Field):
 
     def __init__(self, value: scalar_values,
                  endianness: Optional[Endianness] = None,
-                 validator: Optional[Validator] = None):
+                 validator: Optional[ValidatorType] = None):
         self._endianness_format = endianness.value if endianness else None
         self.scalar_format = ScalarFormat(self.__class__).name
-        self.validator = validator
+        self.validator = as_validator(validator)
         self.value = value
 
     @property
@@ -48,6 +48,8 @@ class Scalar(Field):
             struct.pack(self.scalar_format, value)
         except struct.error as e:
             raise ValueError('Value {} is invalid for field type {}: {}'.format(value, self.__class__.__qualname__, e))
+        if self.validator:
+            self.validator.validate(value)
         self._value = value
 
     def __repr__(self):
@@ -156,13 +158,15 @@ class Scalar(Field):
 
 
 class _IntScalar(Scalar):
-    def __init__(self, value: int = 0, endianness: Optional[Endianness] = None, validator: Optional[Validator] = None):
+    def __init__(self, value: int = 0,
+                 endianness: Optional[Endianness] = None,
+                 validator: Optional[ValidatorType] = None):
         super().__init__(value, endianness, validator)
 
 
 class UInt8(_IntScalar):
     # Override constructor because this scalar doesn't have endianness
-    def __init__(self, value: int = 0, validator: Optional[Validator] = None):
+    def __init__(self, value: int = 0, validator: Optional[ValidatorType] = None):
         super().__init__(value, validator=validator)
 
 
@@ -180,7 +184,7 @@ class UInt64(_IntScalar):
 
 class Int8(_IntScalar):
     # Override constructor because this scalar doesn't have endianness
-    def __init__(self, value: int = 0, validator: Optional[Validator] = None):
+    def __init__(self, value: int = 0, validator: Optional[ValidatorType] = None):
         super().__init__(value, validator=validator)
 
 

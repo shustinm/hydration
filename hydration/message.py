@@ -59,8 +59,8 @@ class Message:
         return self.serialize()
 
     def __str__(self):
-        # __str__ every layer and insert a line between each layer
-        return '\n{}\n'.format('-' * 10).join(str(layer) for layer in self.layers)
+        # __str__ every layer and insert a newline between each layer
+        return '\n'.join(str(layer) for layer in self.layers)
 
     def __add__(self, other):
         return Message(self, other)
@@ -114,7 +114,11 @@ class Message:
         return item in self.layers
 
     def __len__(self):
-        return sum(map(len, self.layers))
+        return len(self.layers)
+
+    @property
+    def size(self):
+        return sum(layer.size for layer in self.layers)
 
 
 class MetaField(Field, ABC):
@@ -150,6 +154,10 @@ class MetaField(Field, ABC):
     def __len__(self) -> int:
         return len(self.data_field)
 
+    @property
+    def size(self):
+        return self.data_field.size
+
     def __bytes__(self) -> bytes:
         return bytes(self.data_field)
 
@@ -163,12 +171,13 @@ class MetaField(Field, ABC):
 
 class InclusiveLengthField(MetaField):
     def update(self, message: Message, struct: Struct, struct_index: int):
-        self.value = len(message[struct_index:])
+        self.value = message[struct_index:].size
 
 
 class ExclusiveLengthField(MetaField):
     def update(self, message: Message, struct: Struct, struct_index: int):
-        self.value = len(message[struct_index + 1:])
+        # Slicing doesn't raise IndexError #yolo
+        self.value = message[struct_index + 1:].size
 
 
 class OpcodeField(MetaField):
@@ -177,4 +186,5 @@ class OpcodeField(MetaField):
         self.opcode_dictionary = opcode_dictionary
 
     def update(self, message: Message, struct: Struct, struct_index: int):
-        self.value = self.opcode_dictionary[type(message[struct_index + 1])]
+        with suppress(IndexError):
+            self.value = self.opcode_dictionary[type(message[struct_index + 1])]

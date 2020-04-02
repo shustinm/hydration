@@ -14,7 +14,7 @@ def test_message():
     x = Tomer() / Lior() / Tomer()
     assert x[0] == x[Tomer] == x[(Tomer, 0)]
     assert x[-1] == x[(Tomer, 1)]
-    assert len(x) == len(bytes(x))
+    assert x.size == len(bytes(x))
 
 
 def test_bytes_suffix():
@@ -58,19 +58,28 @@ def test_length_fields():
 
 def test_opcode_field():
 
+    class C1(h.Struct):
+        x = h.UInt32
+
+    b_opcodes = {
+        C1: 3
+    }
+
     class B1(h.Struct):
         data = h.UInt8
 
     class B2(h.Struct):
-        pass
+        opcode = h.OpcodeField(h.UInt8, b_opcodes)
 
-    opcodes = {
+    a_opcodes = {
         B1: 1,
         B2: 2
     }
 
     class A(h.Struct):
-        opcode = h.OpcodeField(h.UInt8, opcodes)
+        opcode = h.OpcodeField(h.UInt8, a_opcodes)
 
     assert (A() / B1())[A].opcode == 1
     assert (A() / B2())[A].opcode == 2
+
+    assert (A() / B2() / C1())[B2].opcode == 3

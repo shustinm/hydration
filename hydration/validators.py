@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Union
 
 
 class Validator(ABC):
@@ -69,3 +69,23 @@ class SequenceValidator(Validator):
     def validate(self, value: Iterable):
         for val in value:
             self.validator.validate(val)
+
+
+ValidatorType = Union[Validator, range, int, tuple, str, set, tuple, list, Callable]
+
+
+def as_validator(validator_input: ValidatorType) -> Union[Validator, None]:
+    if validator_input is None:
+        return None
+    if isinstance(validator_input, Validator):
+        return validator_input
+    elif isinstance(validator_input, range):
+        return RangeValidator(validator_input)
+    elif isinstance(validator_input, (int, float, str)):
+        return ExactValueValidator(validator_input)
+    elif isinstance(validator_input, (set, tuple, list)):
+        return SetValidator(validator_input)
+    elif callable(validator_input):
+        return FunctionValidator(validator_input)
+    else:
+        raise TypeError(f'Unable to assign a validator for {validator_input}, please import one and use it explicitly')

@@ -8,7 +8,7 @@ from typing import Callable, List, Iterable, Optional
 
 from .helpers import as_obj, as_type
 from .scalars import Scalar
-from .fields import Field, VLA, TypeDependentLengthField
+from .fields import Field, VLA
 from .endianness import Endianness
 
 
@@ -152,7 +152,7 @@ class Struct(metaclass=StructMeta):
         self.__frozen = True
 
     def __str__(self):
-        x = [self.__class__.__qualname__]
+        x = [f'{self.__class__.__qualname__}:']
         for name, field in self:
             if isinstance(field, Struct):
                 x.append('\t{} ({}):'.format(name, field.__class__.__qualname__))
@@ -162,7 +162,11 @@ class Struct(metaclass=StructMeta):
         return '\n'.join(x)
 
     def __len__(self) -> int:
-        return sum(map(len, self._fields))
+        return sum(field.size for field in self._fields)
+
+    @property
+    def size(self):
+        return len(self)
 
     def __eq__(self, other) -> bool:
         # noinspection PyProtectedMember
@@ -211,10 +215,7 @@ class Struct(metaclass=StructMeta):
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
-                if isinstance(field, TypeDependentLengthField):
-                    split_index = len(field) * len(field.type)
-                else:
-                    split_index = len(field)
+                split_index = field.size
 
                 field_data, data = data[:split_index], data[split_index:]
                 field.value = field.from_bytes(field_data).value
@@ -243,10 +244,7 @@ class Struct(metaclass=StructMeta):
                 data = read_func(field.length)
                 field.from_bytes(data)
             else:
-                if isinstance(field, TypeDependentLengthField):
-                    read_size = len(field) * len(field.type)
-                else:
-                    read_size = len(field)
+                read_size = field.size
 
                 data = read_func(read_size)
                 field.value = field.from_bytes(data).value

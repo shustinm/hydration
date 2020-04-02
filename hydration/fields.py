@@ -2,7 +2,6 @@ import abc
 from abc import ABC
 from typing import Union
 
-from hydration.helpers import as_obj
 from .validators import Validator
 
 
@@ -39,6 +38,10 @@ class Field(ABC):
     @abc.abstractmethod
     def __len__(self) -> int:
         raise NotImplementedError
+
+    @property
+    def size(self):
+        return len(self)
 
     @abc.abstractmethod
     def __bytes__(self) -> bytes:
@@ -82,9 +85,3 @@ class VLA(Field, ABC):
 
     def __len__(self):
         return int(self.length)
-
-
-class TypeDependentLengthField(Field, ABC):
-
-    def __init__(self, field_type):
-        self.type = as_obj(field_type)

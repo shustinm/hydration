@@ -3,18 +3,20 @@ from abc import ABC
 from typing import Sequence, Optional, Any, Union
 from itertools import islice, chain
 
-from hydration.message import FieldType
-from .fields import Field, VLA, TypeDependentLengthField
+from .base import Struct
+from .helpers import as_obj
+from .message import FieldType
+from .fields import Field, VLA
 from .scalars import _IntScalar, UInt8
-from .validators import Validator, SequenceValidator
+from .validators import Validator, SequenceValidator, as_validator, ValidatorType
 
 
-class _Sequence(TypeDependentLengthField, ABC):
+class _Sequence(Field, ABC):
     def __init__(self, field_type: FieldType,
                  value: Sequence[Any] = (),
-                 validator: Optional[Validator] = None):
-        super().__init__(field_type)
-        self.validator = validator
+                 validator: Optional[ValidatorType] = None):
+        self.type = as_obj(field_type)
+        self.validator = as_validator(validator)
         self.value = value
 
     @property
@@ -61,12 +63,25 @@ class _Sequence(TypeDependentLengthField, ABC):
     def __ne__(self, other):
         return not self == other
 
+    @property
+    def size(self):
+        ret_val = 0
+        for val in self.value:
+            if isinstance(val, Field):
+                ret_val += val.size
+            elif isinstance(val, Struct):
+                ret_val += len(val)
+            else:
+                ret_val += self.type.size
+
+        return ret_val
+
 
 class Array(_Sequence):
     def __init__(self, length: int,
                  field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
-                 validator: Optional[Validator] = None):
+                 validator: Optional[ValidatorType] = None):
         self.length = length
         super().__init__(field_type=field_type, value=value, validator=validator)
 
@@ -93,7 +108,7 @@ class Vector(_Sequence, VLA):
     def __init__(self, length: Union[_IntScalar, str],
                  field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
-                 validator: Optional[Validator] = None):
+                 validator: Optional[ValidatorType] = None):
         VLA.__init__(self, length)
         _Sequence.__init__(self, field_type=field_type, value=(), validator=validator)
         self.value = value
