@@ -3,7 +3,7 @@ import hydration as h
 
 
 class Tst(h.Struct):
-    a = h.UInt8(validator=h.ExactValueValidator(0))
+    a = h.UInt8(validator=0)
 
 
 def test_init():
@@ -17,19 +17,18 @@ def test_from_bytes():
 
 
 def test_bad_struct():
-    class BadStruct(h.Struct):
-        a = h.UInt8(validator=h.ExactValueValidator(2))
-
     with pytest.raises(ValueError):
-        BadStruct()
+        # noinspection PyUnusedLocal
+        class BadStruct(h.Struct):
+            a = h.UInt8(validator=2)
 
 
 def test_validation_types():
     class Good(h.Struct):
-        i32 = h.Int32(5, validator=h.FunctionValidator(lambda z: z > 4))
-        i32_range = h.Int32(14, validator=h.RangeValidator(range(0, 30, 2)))
-        i32_set = h.Int32(2, validator=h.SetValidator({1, 2, 3}))
-        i32_arr = h.Array(length=5, field_type=h.UInt8(5), validator=h.ExactValueValidator(5))
+        i32 = h.Int32(5, validator=lambda z: z > 4)
+        i32_range = h.Int32(14, validator=range(0, 30, 2))
+        i32_set = h.Int32(2, validator={1, 2, 3})
+        i32_arr = h.Array(length=5, field_type=h.UInt8(5), validator=5)
 
     x = Good()
 
