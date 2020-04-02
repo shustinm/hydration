@@ -18,7 +18,6 @@ setuptools.setup(
     install_requires=['pyhooks>=1.0.3'],
     classifiers=[
         'Programming Language :: Python :: 3'
-        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: GNU Affero General Public License v3',
         'Operating System :: OS Independent'
     ],
