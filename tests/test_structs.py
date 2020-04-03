@@ -38,9 +38,10 @@ def test_non_default_args():
 
         def __init__(self, a):
             super().__init__(a)
-            assert a == 3
+            self.x = a
 
     c = Check(3)
+    assert c.x == 3
     c.from_bytes(bytes(c))
 
     class CheckBad(h.Struct):
@@ -122,3 +123,24 @@ def test_type_field():
 
     d = Dror()
     assert d.a == d.b
+
+
+def test_inherit_default_args():
+    class Amadeus(h.Struct):
+        x = h.UInt32
+
+        def __init__(self, x, *args, **kwargs):
+            super().__init__(x, *args, **kwargs)
+
+    a = Amadeus(3)
+    assert Amadeus(3).from_bytes(bytes(a)) == a
+
+    class Mozart(Amadeus):
+        y = h.UInt16
+
+        def __init__(self, x, y, **kwargs):
+            super().__init__(x, y, **kwargs)
+            self.y = y
+
+    m = Mozart(4, 5)
+    assert Mozart(0, 0).from_bytes(bytes(m)) == m

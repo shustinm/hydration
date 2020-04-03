@@ -6,6 +6,8 @@ and can be converted to (and from) bytes
 >>> f = UInt16(1512)
 >>> bytes(f)
 b'\xe8\x05'
+>>> UInt16().from_bytes(b'\xe8\x05')
+UInt16(1512)
 ```
 
 #### Scalars

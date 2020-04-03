@@ -1,6 +1,6 @@
 ### Struct
 A struct is a composite of fields. 
-To create a struct, Inherit from `Struct` to combine multiple `Field`s:
+To create a struct, Inherit from `Struct` to combine multiple fields:
 ```python
 from hydration import *
 
@@ -17,15 +17,20 @@ MyStruct
     b:	UInt8(3)
 >>> bytes(st)
 b'\n\x03'
+>>> print(MyStruct.from_bytes(b'\n\x03'))
+MyStruct:
+	a:	UInt8(10)
+	b:	UInt8(3)
 ```
 Structs are also mutable, so you can set field values after their creation.
 ```pycon
->>> st = MyStruct()
+>>> st = MyStruct(a=10)
 >>> st.b = 5
 >>> print(st)
 MyStruct
     a:	UInt8(10)
     b:	UInt8(5)
->>> bytes(st)
-b'\n\x05'
 ```
+
+#### [WIP] Inheritance
+#### [WIP] Vectors

@@ -8,7 +8,7 @@ with open('README.md', 'r') as fh:
 setuptools.setup(
     name='hydration',
     version='1.0.1',
-    description='A module for serialization of structs into binary data',
+    description='A module used to define python objects that can be converted to (and from) bytes.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/shustinm/hydration',
@@ -18,7 +18,7 @@ setuptools.setup(
     install_requires=['pyhooks>=1.0.3'],
     classifiers=[
         'Programming Language :: Python :: 3',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: GNU Affero General Public License v3',
         'Operating System :: OS Independent'
     ],
