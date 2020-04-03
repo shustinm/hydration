@@ -79,7 +79,6 @@ opcode_dict = {
 }
 
 class Header3(Struct):
-    # The value of
     opcode = OpcodeField(UInt32, opcode_dict)
 ```
 ```pycon
