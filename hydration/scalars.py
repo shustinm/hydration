@@ -3,7 +3,6 @@ import struct
 from enum import IntEnum
 from typing import Union, Callable, Type, Optional
 
-from .settings import Settings
 from .endianness import Endianness
 from .helpers import as_obj
 from .fields import Field
@@ -24,7 +23,7 @@ class Scalar(Field):
 
     @property
     def endianness_format(self):
-        return self._endianness_format or Settings.DefaultEndianness.value
+        return self._endianness_format or Endianness.Default.value
 
     @endianness_format.setter
     def endianness_format(self, value: Endianness):

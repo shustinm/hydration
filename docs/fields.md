@@ -75,4 +75,5 @@ Array(3, 4, 0, 0, 0, 0)
 Array(3, 4, 5, 5, 5, 5)
 ```
 ##### Vector
-Vectors are sequences of variable size, and can only be used inside a `Struct`. 
+Vectors are sequences of variable size, and can only be used inside a `Struct`,
+so it is documented in [docs/struct.md](https://github.com/shustinm/hydration/blob/master/docs/structs.md)

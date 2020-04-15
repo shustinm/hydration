@@ -72,7 +72,7 @@ class StructMeta(type):
                 # If endianness was given, change endianness (only if it's default)
                 if isinstance(obj, Scalar) and endianness:
                     # Check if the endianness_format was not already set
-                    if not obj.endianness_format:
+                    if not obj._endianness_format:
                         obj.endianness_format = endianness
 
         # Save field names as an attribute, used to iterate over the fields (in order)

@@ -1,6 +1,5 @@
 from .base import Struct
 from .endianness import Endianness
-from .settings import Settings
 from .scalars import (UInt8, UInt16, UInt32, UInt64,
                       Int8, Int16, Int32, Int64,
                       Float, Double, Enum)
@@ -17,7 +16,7 @@ NativeEndian = Endianness.NativeEndian
 NetworkEndian = Endianness.Network
 
 
-__all__ = ['Struct', 'Settings', 'Endianness',
+__all__ = ['Struct', 'Endianness',
            'UInt8', 'UInt16', 'UInt32', 'UInt64',
            'Int8', 'Int16', 'Int32', 'Int64',
            'Float', 'Double', 'Enum',

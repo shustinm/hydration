@@ -83,3 +83,12 @@ def test_opcode_field():
     assert (A() / B2())[A].opcode == 2
 
     assert (A() / B2() / C1())[B2].opcode == 3
+
+
+def test_single():
+    class T(h.Struct):
+        x = h.InclusiveLengthField(h.UInt8)
+        y = h.Array(10)
+
+    t = h.Message(T())
+    assert t[T].x == 11
