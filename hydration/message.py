@@ -1,7 +1,7 @@
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from typing import List, Union, Type
+from typing import List, Union, Type, Mapping
 
 from hydration.helpers import as_obj
 from .base import Struct
@@ -181,7 +181,7 @@ class ExclusiveLengthField(MetaField):
 
 
 class OpcodeField(MetaField):
-    def __init__(self, data_field: FieldType, opcode_dictionary: dict):
+    def __init__(self, data_field: FieldType, opcode_dictionary: Mapping):
         super().__init__(data_field)
         self.opcode_dictionary = opcode_dictionary
 
