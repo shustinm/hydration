@@ -187,4 +187,7 @@ class OpcodeField(MetaField):
 
     def update(self, message: Message, struct: Struct, struct_index: int):
         with suppress(IndexError):
+            if not self.validator:
+                # noinspection PyArgumentList
+                self.validator = Validator(set(self.opcode_dictionary.values()))
             self.value = self.opcode_dictionary[type(message[struct_index + 1])]

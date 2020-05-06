@@ -4,7 +4,7 @@ from typing import Sequence, Optional, Any, Union
 from itertools import islice, chain
 
 from .base import Struct
-from .helpers import as_obj
+from .helpers import as_obj, assert_no_property_override
 from .message import FieldType
 from .fields import Field, VLA
 from .scalars import _IntScalar, UInt8
@@ -16,6 +16,7 @@ class _Sequence(Field, ABC):
                  value: Sequence[Any] = (),
                  validator: Optional[ValidatorType] = None):
         self.type = as_obj(field_type)
+        assert_no_property_override(self.type, _Sequence)
         self.validator = as_validator(validator)
         self.value = value
 

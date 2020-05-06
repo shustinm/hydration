@@ -2,14 +2,14 @@ import abc
 from abc import ABC
 from typing import Union
 
-from .validators import Validator
+from .validators import ValidatorABC
 
 
 class Field(ABC):
 
     @property
     @abc.abstractmethod
-    def validator(self) -> Validator:
+    def validator(self) -> ValidatorABC:
         raise NotImplementedError
 
     @validator.setter
@@ -85,3 +85,36 @@ class VLA(Field, ABC):
 
     def __len__(self):
         return int(self.length)
+
+    def find_and_set_field_name(self, attributes):
+        for attr_name, attr in attributes.items():
+            if attr is self.length_field_obj:
+                self.length_field_name = attr_name
+                return
+        else:
+            raise RuntimeError('Unable to find field {} for VLA {}'.format(self.length_field_obj, self))
+
+
+class FieldPlaceholder(Field):
+    @property
+    def validator(self):
+        return
+
+    @property
+    def value(self):
+        return
+
+    def __repr__(self) -> str:
+        return 'DynamicField()'
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __len__(self) -> int:
+        return 0
+
+    def __bytes__(self) -> bytes:
+        raise AttributeError('Placeholders cannot be serialized')
+
+    def from_bytes(self, data: bytes):
+        raise AttributeError('Placeholders cannot be deserialized')

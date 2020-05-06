@@ -24,6 +24,7 @@ def test_field_copy():
 @pytest.mark.parametrize('field', (h.UInt8, h.UInt8(), 3))
 def test_redefining_fields(field):
     with pytest.raises(NameError):
+        # noinspection PyUnusedLocal
         class Check(Omri):
             a = field
 

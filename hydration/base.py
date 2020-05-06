@@ -6,10 +6,12 @@ from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
 from typing import Callable, List, Iterable, Optional
 
-from .helpers import as_obj, as_type
+from .helpers import as_obj, assert_no_property_override, as_type
 from .scalars import Scalar
 from .fields import Field, VLA
 from .endianness import Endianness
+
+illegal_field_names = ['value', 'validate', '_fields']
 
 
 class StructMeta(type):
@@ -37,46 +39,48 @@ class StructMeta(type):
         attributes = base_fields
 
         # Save some metadata in private members
-        # List of the parent classes of the class
-        attributes['_bases'] = list(base.__qualname__ for base in bases)
         # Whether the Struct is a footer or not, used to determine order of attributes in child classes
         attributes['_footer'] = footer
 
-        # Create the list of the final fields and set them as attributes
-        field_names = []
-        for field_name, field_obj in attributes.items():
-            with suppress(AttributeError):
-                # Check if the field_obj inherits from Struct, and is NOT actually `Struct` class
-                if 'Struct' in field_obj._bases:
-                    # This field_obj will be treated as a nested struct
-                    field_names.append(field_name)
-                    attributes[field_name] = field_obj
-                    continue
-
-            # Check if the field_obj is a Field, can't handle much else...
-            if issubclass(as_type(field_obj), Field):
-                field_names.append(field_name)
-                obj = as_obj(field_obj)
-                attributes[field_name] = obj
-
-                # VLA fields require care - the Struct must resolve the VLA's length field name (if not already given)
-                if isinstance(obj, VLA) and not obj.length_field_name:
-                    # Look for the name of the field which has the VLA's length
-                    for attr_name, attr in attributes.items():
-                        if attr is obj.length_field_obj:
-                            obj.length_field_name = attr_name
-                            break
-                    else:
-                        raise RuntimeError('Unable to find field {} for VLA {}'.format(field_obj.length_field_obj,
-                                                                                       field_obj))
-                # If endianness was given, change endianness (only if it's default)
-                if isinstance(obj, Scalar) and endianness:
-                    # Check if the endianness_format was not already set
-                    if not obj._endianness_format:
-                        obj.endianness_format = endianness
-
         # Save field names as an attribute, used to iterate over the fields (in order)
-        attributes['_field_names'] = field_names
+        attributes['_field_names'] = []
+
+        # Check if the metaclass is running for class Struct itself, in which case, it won't have any fields
+        if not bases:
+            return super().__new__(mcs, name, bases, attributes)
+
+        # Some fields/api require extra logic, so it's executed here
+        for field_name, field_obj in attributes.items():
+
+            # Ignore attributes that aren't hydra fields or structs
+            if not issubclass(as_type(field_obj), (Field, Struct)):
+                continue
+
+            # Convert to object (this is to support non-instantiated Structs
+            field_obj = as_obj(field_obj)
+            attributes['_field_names'].append(field_name)
+            attributes[field_name] = field_obj
+
+            '''
+            Nested struct act as fields, so make sure the properties are not overridden
+            by fields with the same name
+            '''
+            if isinstance(field_obj, Struct):
+                assert_no_property_override(field_obj, Struct)
+
+            '''
+            VLA's length field name must be resolved (if not already given)
+            '''
+            if isinstance(field_obj, VLA) and not field_obj.length_field_name:
+                # Look for the name of the field which has the VLA's length
+                field_obj.find_and_set_field_name(attributes)
+
+            # If endianness was given, change endianness (only if it's default)
+            if isinstance(field_obj, Scalar) and endianness:
+                # Check if the endianness_format was not already set
+                if not field_obj._endianness_format:
+                    field_obj.endianness_format = endianness
+
         return super().__new__(mcs, name, bases, attributes)
 
     def __len__(self):
