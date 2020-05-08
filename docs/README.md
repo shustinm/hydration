@@ -3,8 +3,16 @@
 ![Tests](https://github.com/shustinm/hydration/workflows/Tests/badge.svg?branch=master)
 ![PyPI](https://img.shields.io/pypi/v/hydration)
 
+---
+
 <p align="center">
 This software has been designed for you, with much joy, by <a href="https://github.com/shustinm/">Michael Shustin</a>
+</p>
+
+---
+
+<p align="center">
+You can find the complete documentation <a href=https://shustinm.github.io/hydration/>here</a>
 </p>
 
 ---
@@ -83,7 +91,7 @@ b'\xef\xbe\xad\xde\x00\x008@\x80'
 ```
 
 ### Advanced features
-For more advanced usage, be sure to check the [docs](https://github.com/shustinm/hydration/tree/master/docs) folder.
+For more advanced usage, be sure to check the [documentation](https://shustinm.github.io/hydration/).
 
 ## Support
 Want to report a bug? Request a feature? Please do so [here](https://github.com/shustinm/hydration/issues/new/choose)

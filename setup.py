@@ -8,7 +8,7 @@ with open(Path('docs') / 'README.md', 'r') as fh:
 
 setuptools.setup(
     name='hydration',
-    version='2.1.2',
+    version='2.1.3',
     description='A module used to define python objects that can be converted to (and from) bytes.',
     long_description=long_description,
     long_description_content_type='text/markdown',

@@ -1,7 +1,19 @@
 site_name: Hydration Documentation
+site_url: https://shustinm.github.io/hydration/
+repo_url: https://github.com/shustinm/hydration/
+site_author: Michael Shustin
 
 theme:
   name: material
 
 markdown_extensions:
   - codehilite
+
+nav:
+  - Introduction: 'README.md'
+  - 'fields.md'
+  - 'structs.md'
+  - 'messages.md'
+
+plugins:
+  - search
