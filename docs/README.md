@@ -1,9 +1,10 @@
 # Hydration
 
 ![Tests](https://github.com/shustinm/hydration/workflows/Tests/badge.svg?branch=master)
+![PyPI](https://img.shields.io/pypi/v/hydration)
 
 <p align="center">
-This software has been designed for you, with much joy, by <a href="http://github.shust.in">Michael Shustin</a>
+This software has been designed for you, with much joy, by <a href="https://github.com/shustinm/">Michael Shustin</a>
 </p>
 
 ---
