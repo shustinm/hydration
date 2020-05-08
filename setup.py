@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import setuptools
+from pathlib import Path
 
-with open('README.md', 'r') as fh:
+with open(Path('docs') / 'README.md', 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name='hydration',
-    version='2.1.0',
+    version='2.1.1',
     description='A module used to define python objects that can be converted to (and from) bytes.',
     long_description=long_description,
     long_description_content_type='text/markdown',
