@@ -1,4 +1,4 @@
-name: Deploy package and docs
+name: Deploy to PyPI
 
 on:
   push:
@@ -27,7 +27,3 @@ jobs:
       run: |
         python setup.py sdist bdist_wheel
         twine upload dist/*
-    - name: Deploy MkDocs
-      uses: mhausenblas/mkdocs-deploy-gh-pages@1.11
-      env:
-        GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
