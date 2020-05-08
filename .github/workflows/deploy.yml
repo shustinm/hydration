@@ -26,6 +26,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         python setup.py sdist bdist_wheel
+        twine upload dist/*
     - name: Deploy MkDocs
       uses: mhausenblas/mkdocs-deploy-gh-pages@1.11
       env:
