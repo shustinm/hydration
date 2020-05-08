@@ -6,7 +6,7 @@ from typing import Union, Callable, Type, Optional
 from .endianness import Endianness
 from .helpers import as_obj
 from .fields import Field
-from .validators import Validator, FunctionValidator, ValidatorType, as_validator
+from .validators import ValidatorABC, FunctionValidator, ValidatorType, as_validator
 
 scalar_values = Union[int, float]
 
@@ -30,11 +30,11 @@ class Scalar(Field):
         self._endianness_format = value.value
 
     @property
-    def validator(self) -> Validator:
+    def validator(self) -> ValidatorABC:
         return self._validator
 
     @validator.setter
-    def validator(self, value: Validator):
+    def validator(self, value: ValidatorABC):
         self._validator = value
 
     @property
@@ -239,7 +239,7 @@ class Enum(Field):
         self.type.value = self.value
 
     @property
-    def validator(self) -> Validator:
+    def validator(self) -> ValidatorABC:
         return FunctionValidator(lambda x: x in (m.value for m in self.enum_class))
 
     @property

@@ -1,0 +1,7 @@
+site_name: Hydration Documentation
+
+theme:
+  name: material
+
+markdown_extensions:
+  - codehilite
