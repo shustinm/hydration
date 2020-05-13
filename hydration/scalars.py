@@ -1,6 +1,8 @@
 import enum
 import struct
 from enum import IntEnum
+from numbers import Real, Integral
+from math import trunc, floor, ceil
 from typing import Union, Callable, Type, Optional
 
 from .endianness import Endianness
@@ -11,7 +13,7 @@ from .validators import ValidatorABC, FunctionValidator, ValidatorType, as_valid
 scalar_values = Union[int, float]
 
 
-class Scalar(Field):
+class Scalar(Field, Real):
 
     def __init__(self, value: scalar_values,
                  endianness: Optional[Endianness] = None,
@@ -61,82 +63,46 @@ class Scalar(Field):
         return len(bytes(self))
 
     def __add__(self, other):
-        if isinstance(other, Field):
-            return self.value + other.value
-        else:
-            return self.value + other
+        return self.value + other
 
     def __radd__(self, other):
         return other + self.value
 
     def __sub__(self, other):
-        if isinstance(other, Field):
-            return self.value - other.value
-        else:
-            return self.value - other
+        return self.value - other
 
     def __rsub__(self, other):
-        if isinstance(other, Field):
-            return other.value - self.value
-        else:
-            return other - self.value
+        return other - self.value
 
     def __mul__(self, other):
-        if isinstance(other, Field):
-            return self.value * other.value
-        else:
-            return self.value * other
+        return self.value * other
 
     def __rmul__(self, other):
         return other * self.value
 
     def __truediv__(self, other):
-        if isinstance(other, Field):
-            return self.value / other.value
-        else:
-            return self.value / other
+        return self.value / other
 
     def __rtruediv__(self, other):
-        if isinstance(other, Field):
-            return other.value / self.value
-        else:
-            return other / self.value
+        return other / self.value
 
     def __floordiv__(self, other):
-        if isinstance(other, Field):
-            return self.value // other.value
-        else:
-            return self.value // other
+        return self.value // other
 
     def __rfloordiv__(self, other):
-        if isinstance(other, Field):
-            return other.value // self.value
-        else:
-            return other // self.value
+        return other // self.value
 
     def __mod__(self, other):
-        if isinstance(other, Field):
-            return self.value % other.value
-        else:
-            return self.value % other
+        return self.value % other
 
     def __rmod__(self, other):
-        if isinstance(other, Field):
-            return other.value % self.value
-        else:
-            return other % self.value
+        return other % self.value
 
     def __xor__(self, other):
-        if isinstance(other, Field):
-            return self.value ^ other.value
-        else:
-            return self.value ^ other
+        return self.value ^ other
 
     def __rxor__(self, other):
-        if isinstance(other, Field):
-            return other.value ^ self.value
-        else:
-            return other ^ self.value
+        return other ^ self.value
 
     def __bytes__(self) -> bytes:
         format_string = '{}{}'.format(self.endianness_format,
@@ -155,8 +121,79 @@ class Scalar(Field):
         self.value = struct.unpack(format_string, data)[0]
         return self
 
+    def __trunc__(self):
+        return trunc(self.value)
 
-class _IntScalar(Scalar):
+    def __floor__(self):
+        return floor(self.value)
+
+    def __ceil__(self):
+        return ceil(self.value) + 1
+
+    def __round__(self, ndigits=None):
+        return round(self.value, ndigits)
+
+    def __lt__(self, other):
+        return self.value < other
+
+    def __le__(self, other):
+        return self.value <= other
+
+    def __gt__(self, other):
+        return self.value > other
+
+    def __ge__(self, other):
+        return self.value >= other
+
+    def __eq__(self, other):
+        return self.value == other
+
+    def __neg__(self):
+        return -self.value
+
+    def __pos__(self):
+        return +self.value
+
+    def __pow__(self, exponent):
+        return self.value ** exponent
+
+    def __rpow__(self, base):
+        return base ** self.value
+
+    def __abs__(self):
+        return abs(self.value)
+
+
+class _IntScalar(Scalar, Integral):
+    def __lshift__(self, other):
+        if isinstance(other, Field):
+            return self.value << other.value
+        return self.value << other
+
+    def __rlshift__(self, other):
+        return other << self.value
+
+    def __rshift__(self, other):
+        return self.value >> other
+
+    def __rrshift__(self, other):
+        return other >> self.value
+
+    def __and__(self, other):
+        return self.value & other
+
+    def __rand__(self, other):
+        return other & self.value
+
+    def __or__(self, other):
+        return self.value | other
+
+    def __ror__(self, other):
+        return other | self.value
+
+    def __invert__(self):
+        return ~self.value
+
     def __init__(self, value: int = 0,
                  endianness: Optional[Endianness] = None,
                  validator: Optional[ValidatorType] = None):

@@ -145,3 +145,20 @@ def test_inherit_default_args():
 
     m = Mozart(4, 5)
     assert Mozart(0, 0).from_bytes(bytes(m)) == m
+
+
+def test_from_bytes_hooks():
+    class Ronen(h.Struct):
+        x = h.UInt8(2)
+        arr = h.Array(10, h.FieldPlaceholder, value=list(range(10)))
+
+        @h.Struct.from_bytes_hook(arr)
+        def foo(self):
+            self.arr.type = h.UInt16()
+
+    r = Ronen()
+    r.arr.type = h.UInt16()
+
+    r2 = Ronen.from_bytes(bytes(r))
+
+    assert r2.arr == list(range(10))

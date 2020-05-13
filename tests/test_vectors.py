@@ -1,15 +1,17 @@
+import pytest
+
 import hydration as h
 
 
 class Garzon(h.Struct):
-    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
+    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2), fill=True)
     nested_vla_len = h.UInt16()
     nested_vla = h.Vector(field_type=h.Int32(), length=nested_vla_len, value=(9, 10, 100))
     x = h.UInt8(5)
 
 
 class Shine(h.Struct):
-    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
+    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2), fill=True)
     vec_len = h.UInt8()
     vec = h.Vector(field_type=h.UInt8(), length=vec_len)
     y = h.UInt64(9)
@@ -37,7 +39,7 @@ def test_vector_len_update():
 
 
 class Isaac(h.Struct):
-    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2))
+    arr = h.Array(field_type=h.UInt8(3), length=3, value=(1, 2), fill=True)
     x = h.UInt8(5)
 
 
@@ -55,9 +57,15 @@ def test_array():
 
 def test_good_validator():
     class Shustin(h.Struct):
-        arr = h.Array(3, h.UInt8(8), validator=h.FunctionValidator(lambda x: x > 7))
+        arr = h.Array(3, h.UInt8(8), validator=lambda x: x > 7, fill=True)
 
-    assert Shustin()
+    Shustin()
+
+    class Shustin2(h.Struct):
+        arr = h.Array(3, h.UInt8(8), validator=lambda x: x > 9, fill=True)
+
+    with pytest.raises(ValueError):
+        Shustin2()
 
 
 def test_ipv4():
@@ -69,10 +77,10 @@ def test_ipv4():
 
 def test_type_field():
     class Lior(h.Struct):
-        a = h.Array(5, h.UInt16)
+        a = h.Array(5, h.UInt16, fill=True)
 
     class Raif(h.Struct):
-        a = h.Array(5, h.UInt16())
+        a = h.Array(5, h.UInt16(), fill=True)
 
     assert Lior().a == Raif().a
     assert Lior.a == Raif.a
@@ -82,3 +90,36 @@ def test_type_field():
 
     assert Lior().a != Raif().a
     assert Lior.a != Raif.a
+
+
+def test_seq_as_list():
+    s = Shine()
+    assert set(s.arr) == {1, 2, 3}
+    assert list(s.arr) == [1, 2, 3]
+
+    with pytest.raises(ValueError):
+        s.arr.append(2)
+
+    assert s.arr + [4, 5] == [1, 2, 3, 4, 5]
+    assert [4, 5] + s.arr == [4, 5, 1, 2, 3]
+
+
+class Yakov(h.Struct):
+    arr = h.Array(3)
+
+
+def test_seq_no_fill_as_list():
+    y = Yakov()
+    assert y.arr == []
+
+    y.arr.append(3)
+    assert y.arr == [3]
+
+    y.arr.extend([4, 5])
+    assert y.arr == [3, 4, 5]
+
+    with pytest.raises(ValueError):
+        y.arr.append(1)
+
+    with pytest.raises(ValueError):
+        y.arr.extend([1])

@@ -6,8 +6,7 @@ from typing import List, Union, Type, Mapping
 from hydration.helpers import as_obj
 from .base import Struct
 from .fields import Field
-from .validators import Validator
-
+from .validators import ValidatorABC, as_validator
 
 FieldType = Union[Field, Struct, Type[Field], Type[Struct]]
 
@@ -130,11 +129,11 @@ class MetaField(Field, ABC):
         self.data_field = as_obj(data_field)
 
     @property
-    def validator(self) -> Validator:
+    def validator(self) -> ValidatorABC:
         return self.data_field.validator
 
     @validator.setter
-    def validator(self, value):
+    def validator(self, value: ValidatorABC):
         self.data_field.validator = value
 
     @property
@@ -188,6 +187,5 @@ class OpcodeField(MetaField):
     def update(self, message: Message, struct: Struct, struct_index: int):
         with suppress(IndexError):
             if not self.validator:
-                # noinspection PyArgumentList
-                self.validator = Validator(set(self.opcode_dictionary.values()))
+                self.validator = as_validator(set(self.opcode_dictionary.values()))
             self.value = self.opcode_dictionary[type(message[struct_index + 1])]

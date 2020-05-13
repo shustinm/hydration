@@ -19,7 +19,7 @@ class ValidatorMeta(type):
         return as_validator(valid_input)
 
 
-class Validator(metaclass=ValidatorMeta):
+class _Validator(metaclass=ValidatorMeta):
     pass
 
 
@@ -81,7 +81,7 @@ class SequenceValidator(ValidatorABC):
                 self.validator.validate(val)
 
 
-ValidatorType = Union[Validator, range, int, tuple, str, set, tuple, list, Callable]
+ValidatorType = Union[_Validator, range, int, tuple, str, set, tuple, list, Callable]
 
 
 def as_validator(validator_input: ValidatorType) -> Optional[ValidatorABC]:

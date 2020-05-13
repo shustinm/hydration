@@ -7,7 +7,7 @@ class Tomer(h.Struct):
 
 
 class Lior(h.Struct):
-    a = h.Array(5)
+    a = h.Array(5, fill=True)
 
 
 def test_message():
@@ -88,7 +88,7 @@ def test_opcode_field():
 def test_single():
     class T(h.Struct):
         x = h.InclusiveLengthField(h.UInt8)
-        y = h.Array(10)
+        y = h.Array(10, fill=True)
 
     t = h.Message(T())
     assert t[T].x == 11

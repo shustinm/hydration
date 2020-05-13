@@ -46,7 +46,7 @@ Header1:
 Body1:
 	some_data:	UInt64(43707)
 ```
-As you can see, the value of message_len is 10. (2 byte-long header, and 8 byte-long)
+As you can see, the value of message_len is 10. (2 byte-long header, and 8 byte-long body)
 
 You can also use an `ExclusiveLengthField`. In which case, the field's length calculation 
 <i>excludes</i> the length of its own struct:

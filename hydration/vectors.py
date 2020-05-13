@@ -1,6 +1,7 @@
 import copy
 from abc import ABC
-from typing import Sequence, Optional, Any, Union
+from collections import UserList
+from typing import Sequence, Optional, Any, Union, Iterable
 from itertools import islice, chain
 
 from .base import Struct
@@ -8,35 +9,38 @@ from .helpers import as_obj, assert_no_property_override
 from .message import FieldType
 from .fields import Field, VLA
 from .scalars import _IntScalar, UInt8
-from .validators import Validator, SequenceValidator, as_validator, ValidatorType
+from .validators import SequenceValidator, as_validator, ValidatorType, ValidatorABC
 
 
-class _Sequence(Field, ABC):
-    def __init__(self, field_type: FieldType,
-                 value: Sequence[Any] = (),
-                 validator: Optional[ValidatorType] = None):
+class _Sequence(UserList, Field, ABC):
+    def __init__(self, field_type: FieldType, value: Sequence[Any] = (), validator: Optional[ValidatorType] = None):
+        super().__init__()
         self.type = as_obj(field_type)
         assert_no_property_override(self.type, _Sequence)
         self.validator = as_validator(validator)
         self.value = value
 
     @property
-    def validator(self) -> Validator:
+    def validator(self) -> ValidatorABC:
         return self._validator
 
     @validator.setter
-    def validator(self, value: Validator):
+    def validator(self, value: ValidatorABC):
         self._validator = SequenceValidator(value)
 
     @property
     def value(self):
-        return self._value
+        return self.data
 
     @value.setter
     def value(self, value):
-        self._value = value
+        self.data = value
 
     def __bytes__(self) -> bytes:
+        if len(self.value) != len(self):
+            raise ValueError(f'Array value ({self.value}) does not match the provided length ({len(self)}). '
+                             f'Consider passing `fill=True` to the {self.__class__.__name__} constructor')
+
         field_type = copy.deepcopy(self.type)
 
         result = bytearray()
@@ -58,11 +62,15 @@ class _Sequence(Field, ABC):
         return '{}(field_type={}, length={}, value={})'.format(
             self.__class__.__qualname__, self.type, len(self), self.value)
 
-    def __eq__(self, other):
-        return self.type == other.type and all(x == y for x, y in zip(self.value, other.value))
+    def __add__(self, other):
+        return self.data + list(other)
 
-    def __ne__(self, other):
-        return not self == other
+    def __radd__(self, other):
+        return list(other) + self.data
+
+    def __iadd__(self, other):
+        self.value = self.data + list(other)
+        return self
 
     @property
     def size(self):
@@ -77,31 +85,69 @@ class _Sequence(Field, ABC):
 
         return ret_val
 
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def append(self, item) -> None:
+        self.value = self.data + [item]
+
+    def insert(self, key: int, item) -> None:
+        self.data.insert(key, item)
+        self.value = self.data
+
+    def pop(self, i: int = ...):
+        self.data.pop(i)
+        self.value = self.data
+
+    def remove(self, item) -> None:
+        self.data.remove(item)
+        self.value = self.data
+
+    def clear(self) -> None:
+        self.value = []
+
+    def extend(self, other: Iterable) -> None:
+        self.data.extend(other)
+        self.value = self.data
+
 
 class Array(_Sequence):
     def __init__(self, length: int,
                  field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
-                 validator: Optional[ValidatorType] = None):
+                 validator: Optional[ValidatorType] = None,
+                 fill: bool = False):
         self.length = length
+        self.fill = fill
         super().__init__(field_type=field_type, value=value, validator=validator)
 
-    # noinspection PyAttributeOutsideInit
-    @_Sequence.value.setter
-    def value(self, value: Sequence[Any]):
-        # Make sure that the given value isn't too long
+    def assert_value_not_too_long(self, value):
+        """Make sure that the given value isn't too long"""
         if len(value) > len(self):
-            raise ValueError('Given value is too long for the length given. Expected {} or less, given {}'.format(
-                len(self), len(value)
+            raise ValueError('Length will be too long. Data length was {}. Max is {} but tried to add {}'.format(
+                len(self.data), len(self), len(value)
             ))
 
-        # Extend with the value of the default field value to fill the length (this tuple might be empty)
-        extension = (self.type.value,) * (len(self) - len(value))
+    def fill_if_necessary(self):
+        """
+        Extend with the value of the default field value to fill the length (this tuple might be empty).
+        Will only fill if `self.fill` is `True`
+        """
+        if self.fill:
+            self.data.extend(self.type.value for _ in range(len(self) - len(self.data)))
 
-        self._value = tuple(chain(value, extension))
+    @_Sequence.value.setter
+    def value(self, value: Sequence[Any]):
+        self.assert_value_not_too_long(value)
+        self.data = list(value)
+        self.fill_if_necessary()
 
     def __len__(self) -> int:
         return self.length
+
+    def __delitem__(self, key) -> None:
+        super().__delitem__(key)
+        self.fill_if_necessary()
 
 
 class Vector(_Sequence, VLA):
@@ -117,8 +163,7 @@ class Vector(_Sequence, VLA):
     # noinspection PyAttributeOutsideInit
     @_Sequence.value.setter
     def value(self, value):
-        # Convert value to a mutable list and set
-        self._value = value
+        self.data = list(value)
 
         # This assumes that the Struct will update the length field's value
         self.length = len(value)
@@ -148,7 +193,7 @@ class IPv4(Array):
         x = value.split('.')
         if len(x) != 4:
             raise ValueError('IP length mismatch. Expected 4, got {}'.format(len(x)))
-        self._value = tuple(int(z) for z in x)
+        self.data = list(int(z) for z in x)
 
     def __str__(self):
         return '.'.join(str(x) for x in self.value)

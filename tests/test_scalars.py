@@ -35,6 +35,18 @@ def test_enums():
     assert x.from_bytes(bytes(x)).d == Guy.c
 
 
-def test_wrong_size():
+def test_different_size():
     g = Gilad()
-    assert g.i8 != g.i16
+    assert g.i8 == g.i16
+
+
+def test_add():
+    assert h.UInt8(2) + 3 == 5
+    assert 2 + h.UInt8(3) == 5
+    assert h.UInt8(2) + h.UInt16(3) == 5
+
+
+def test_comparisons():
+    assert h.UInt16(3) > h.UInt16(2)
+    assert h.UInt16(3) == h.UInt16(3)
+    assert h.UInt16(4) == h.UInt8(4)

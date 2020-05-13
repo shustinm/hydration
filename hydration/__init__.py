@@ -10,6 +10,7 @@ from .fields import FieldPlaceholder
 
 pre_bytes_hook = Struct.pre_bytes_hook
 post_bytes_hook = Struct.post_bytes_hook
+from_bytes_hook = Struct.from_bytes_hook
 
 LittleEndian = Endianness.LittleEndian
 BigEndian = Endianness.BigEndian
@@ -24,5 +25,5 @@ __all__ = ['Struct', 'Endianness',
            'Array', 'Vector', 'IPv4', 'FieldPlaceholder',
            'ExactValueValidator', 'RangeValidator', 'FunctionValidator', 'SetValidator',
            'Message', 'InclusiveLengthField', 'ExclusiveLengthField', 'OpcodeField',
-           'pre_bytes_hook', 'post_bytes_hook',
+           'pre_bytes_hook', 'post_bytes_hook', 'from_bytes_hook',
            'LittleEndian', 'BigEndian', 'NativeEndian', 'NetworkEndian']

@@ -95,6 +95,7 @@ class StructMeta(type):
 class Struct(metaclass=StructMeta):
     __frozen = False
     _field_names: List[str]
+    _from_bytes_hooks = {}
 
     @property
     def value(self):
@@ -136,6 +137,8 @@ class Struct(metaclass=StructMeta):
         # Encapsulate the functions so the arguments are automatically passed without changing from_bytes API
         self.from_bytes = lambda data: self._from_bytes(data, *args)
         self.from_stream = lambda data: self._from_stream(data, *args)
+
+        self._from_bytes_hooks = {}
 
         # Deepcopy the fields so different instances of Struct have unique fields
         for name, field in self:
@@ -214,6 +217,9 @@ class Struct(metaclass=StructMeta):
         obj = cls(*args)
 
         for field in obj._fields:
+
+            obj.invoke_from_bytes_hooks(field)
+
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
                 field.from_bytes(data)
@@ -243,6 +249,9 @@ class Struct(metaclass=StructMeta):
         obj = cls(*args)
 
         for field in obj._fields:
+
+            obj.invoke_from_bytes_hooks(field)
+
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
                 data = read_func(field.length)
@@ -284,3 +293,20 @@ class Struct(metaclass=StructMeta):
             super().__setattr__(key, value)
         else:
             raise AttributeError("Struct doesn't allow defining new attributes")
+
+    def invoke_from_bytes_hooks(self, field: Field):
+        for f in getattr(field, '_from_bytes_hooks', ()):
+            f(self)
+
+    @classmethod
+    def from_bytes_hook(cls, field):
+
+        # noinspection PyProtectedMember
+        def register_field_hook(func: callable):
+            if hasattr(field, '_from_bytes_hooks'):
+                field._from_bytes_hooks.append(func)
+            else:
+                field._from_bytes_hooks = [func]
+            return func
+
+        return register_field_hook
