@@ -40,7 +40,7 @@ def test_length_fields():
         y = h.UInt8
 
     class D(h.Struct):
-        v = h.Vector('y')
+        v = h.Vector(length='y')
 
     msg = A() / B()
 

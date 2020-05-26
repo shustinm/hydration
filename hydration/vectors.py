@@ -75,11 +75,11 @@ class _Sequence(UserList, Field, ABC):
     @property
     def size(self):
         ret_val = 0
+        # The sequences are homogeneous, but the size of each item isn't always the same
+        # So we must loop through all items, and sum their size.
         for val in self.value:
-            if isinstance(val, Field):
+            if isinstance(val, (Field, Struct)):
                 ret_val += val.size
-            elif isinstance(val, Struct):
-                ret_val += len(val)
             else:
                 ret_val += self.type.size
 
@@ -148,6 +148,10 @@ class Array(_Sequence):
     def __delitem__(self, key) -> None:
         super().__delitem__(key)
         self.fill_if_necessary()
+
+    @property
+    def size(self):
+        return len(self) * len(self.type)
 
 
 class Vector(_Sequence, VLA):

@@ -123,3 +123,12 @@ def test_seq_no_fill_as_list():
 
     with pytest.raises(ValueError):
         y.arr.extend([1])
+
+
+def test_array_deserialization():
+    class Data(h.Struct):
+        data = h.Array(10)
+
+    d = Data(data=[3] * 10)
+    b = bytes(d)
+    assert Data.from_bytes(b).data == d.data
