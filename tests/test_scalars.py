@@ -25,7 +25,7 @@ class Guy(enum.IntEnum):
 
 
 class Dar(h.Struct):
-    d = h.Enum(h.UInt32(), Guy)
+    d = h.Enum(h.UInt32, Guy)
 
 
 def test_enums():

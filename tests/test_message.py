@@ -22,6 +22,13 @@ def test_bytes_suffix():
     assert bytes(x) == b''.join((bytes(Tomer()), bytes(Lior()), b'test'))
 
 
+def test_suffix_with_length():
+    class Header(h.Struct):
+        length = h.InclusiveLengthField(h.UInt16)
+
+    Header() / b'lomeshane'
+
+
 def test_associativity():
     assert (Tomer() / Lior() / b'test') == (Tomer() / (Lior() / b'test')) == ((Tomer() / Lior()) / b'test')
 

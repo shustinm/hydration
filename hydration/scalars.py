@@ -267,9 +267,9 @@ class Enum(Field):
                  enum_class: Type[enum.IntEnum],
                  value: Optional[enum.IntEnum] = None):
         super().__init__()
-        if scalar_type.value != 0:
-            raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
         self.type = as_obj(scalar_type)
+        if self.type.value != 0:
+            raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
         self.enum_class = enum_class
         # noinspection PyTypeChecker
         self.value = value or next(iter(self.enum_class))

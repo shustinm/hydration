@@ -117,7 +117,8 @@ class Message:
 
     @property
     def size(self):
-        return sum(layer.size for layer in self.layers)
+        # layers are structs or bytes, so use len instead of size
+        return sum(len(layer) for layer in self.layers)
 
 
 class MetaField(Field, ABC):
