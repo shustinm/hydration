@@ -1,3 +1,5 @@
+import enum
+
 import pytest
 import hydration as h
 
@@ -43,3 +45,21 @@ def test_validation_types():
 
     with pytest.raises(ValueError):
         x.i32_arr = [5, 5, 5, 5, 4]
+
+
+@pytest.mark.parametrize('scalar_type', [h.UInt8, h.UInt16, h.UInt32, h.UInt64,
+                                         h.Int8, h.Int16, h.Int32, h.Int64,
+                                         h.Float, h.Double])
+def test_scalar_validation_without_struct(scalar_type):
+    a = scalar_type(validator=range(3))
+    with pytest.raises(ValueError):
+        a.value = 3
+
+
+def test_enum_validation_without_struct():
+    class TEnum(enum.IntEnum):
+        a = 1
+
+    b = h.Enum(h.UInt8, TEnum)
+    with pytest.raises(ValueError):
+        b.value = 2

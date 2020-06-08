@@ -27,7 +27,8 @@ Scalars are simple fields that represent low-level primitive data types:
 | `Double`     | 8 bytes  |
 
 ##### Validation
-Fields have a `validator` keyword argument, you
+Fields have a `validator` keyword argument, which allows you catch errors during early
+stages of the object creation, whether by construction or `from_bytes`
 ```python
 from hydration import *
 
@@ -52,11 +53,34 @@ b'\x03\x00\x00\x00'
 ```
 NOTE: The default endianness is that of your architecture, so it might be different on other processor architectures.
 
+
+##### Enum
+Enums are scalars that makes working with `enum.IntEnum` easier.
+```python
+from enum import IntEnum
+
+class Color(IntEnum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+By using enums, you get clean, readable code. The constructor receives the class of the Enum
+and takes care of initialization and validation for you. (The default value is the first enum)
+```pycon
+>>> field = Enum(UInt8, Color)
+>>> field.name
+'RED'
+>>> field.value
+1
+>>> field.value = 4
+ValueError: 4 is not a valid Color
+```
+
 #### Sequences
 Sequences are homogeneous collection of fields or structs, e.g. `Array` and `Vector`
 
 ##### Array
-An array is a sequence of constant size
+Arrays are sequences of constant size
 ```pycon
 >>> bytes(Array(3, value=[1, 2, 3]))
 b'\x01\x02\x03'

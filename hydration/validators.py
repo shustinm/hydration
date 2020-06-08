@@ -1,3 +1,4 @@
+import enum
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Union, Optional
 
@@ -75,13 +76,21 @@ class SequenceValidator(ValidatorABC):
         """
         self.validator = scalar_validator
 
-    def validate(self, value: Iterable):
+    def validate(self, value: Iterable) -> None:
         if self.validator:
             for val in value:
                 self.validator.validate(val)
 
 
-ValidatorType = Union[_Validator, range, int, tuple, str, set, tuple, list, Callable]
+class EnumValidator(ValidatorABC):
+    def __init__(self, enum_class):
+        self.enum_class = enum_class
+
+    def validate(self, value: Any) -> None:
+        self.enum_class(value)
+
+
+ValidatorType = Union[_Validator, range, int, tuple, str, set, tuple, list, enum.Enum, Callable]
 
 
 def as_validator(validator_input: ValidatorType) -> Optional[ValidatorABC]:
@@ -95,6 +104,8 @@ def as_validator(validator_input: ValidatorType) -> Optional[ValidatorABC]:
         return ExactValueValidator(validator_input)
     elif isinstance(validator_input, (set, tuple, list)):
         return SetValidator(validator_input)
+    elif isinstance(validator_input, enum.EnumMeta):
+        return EnumValidator(validator_input)
     elif callable(validator_input):
         return FunctionValidator(validator_input)
     else:

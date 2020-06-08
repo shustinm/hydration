@@ -8,7 +8,7 @@ from typing import Union, Callable, Type, Optional
 from .endianness import Endianness
 from .helpers import as_obj
 from .fields import Field
-from .validators import ValidatorABC, FunctionValidator, ValidatorType, as_validator
+from .validators import ValidatorABC, ValidatorType, as_validator
 
 scalar_values = Union[int, float]
 
@@ -268,25 +268,24 @@ class Enum(Field):
                  value: Optional[enum.IntEnum] = None):
         super().__init__()
         self.type = as_obj(scalar_type)
+        self.type.validator = as_validator(enum_class)
         if self.type.value != 0:
             raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
         self.enum_class = enum_class
         # noinspection PyTypeChecker
         self.value = value or next(iter(self.enum_class))
-        self.type.value = self.value
 
     @property
     def validator(self) -> ValidatorABC:
-        return FunctionValidator(lambda x: x in (m.value for m in self.enum_class))
+        return self.type.validator
 
     @property
     def value(self):
-        return self._value
+        return self.enum_class(self.type.value).value
 
     @value.setter
     def value(self, value: IntEnum):
         self.type.value = value
-        self._value = value
 
     def __repr__(self) -> str:
         return '{}({}, {}, {})'.format(self.__class__.__qualname__,
@@ -307,3 +306,7 @@ class Enum(Field):
         self.type.from_bytes(data)
         self.value = self.type.value
         return self
+
+    @property
+    def name(self):
+        return self.enum_class(self.value).name

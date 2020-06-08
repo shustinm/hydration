@@ -22,7 +22,7 @@ MyStruct:
 	a:	UInt8(10)
 	b:	UInt8(3)
 ```
-Structs are also mutable, so you can set field values after their creation:
+Structs are also mutable, so you can set field values without explicitly accessing their `value` property:
 ```pycon
 >>> st = MyStruct(a=10)
 >>> st.b = 5

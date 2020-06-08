@@ -2,7 +2,7 @@ import copy
 from abc import ABC
 from collections import UserList
 from typing import Sequence, Optional, Any, Union, Iterable
-from itertools import islice, chain
+from itertools import islice
 
 from .base import Struct
 from .helpers import as_obj, assert_no_property_override

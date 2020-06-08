@@ -1,3 +1,5 @@
+import pytest
+
 import hydration as h
 
 
@@ -11,10 +13,28 @@ class Lior(h.Struct):
 
 
 def test_message():
-    x = Tomer() / Lior() / Tomer()
+    first = Tomer()
+    last = Tomer()
+    x = first / Lior() / last
     assert x[0] == x[Tomer] == x[(Tomer, 0)]
     assert x[-1] == x[(Tomer, 1)]
     assert x.size == len(bytes(x))
+    assert x[-1] is last
+    assert Tomer in x
+    assert Lior in x
+
+    class LiTor(h.Struct):
+        pass
+
+    assert LiTor not in x
+
+    assert first in x
+    assert last in x
+    assert Tomer() not in x
+    assert LiTor() not in x
+
+    with pytest.raises(TypeError):
+        assert 3 not in x
 
 
 def test_bytes_suffix():

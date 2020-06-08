@@ -1,5 +1,7 @@
 import enum
 
+import pytest
+
 import hydration as h
 
 
@@ -33,6 +35,11 @@ def test_enums():
     x = Dar()
     x.d = Guy.c
     assert x.from_bytes(bytes(x)).d == Guy.c
+    assert x.d.name == 'c'
+    assert x.d.value == Guy.c.value
+
+    with pytest.raises(ValueError):
+        x.d = 4
 
 
 def test_different_size():

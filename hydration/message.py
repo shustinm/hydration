@@ -88,8 +88,14 @@ class Message:
         # Find the item[1]-th occurrence of an instance of item[0]
         elif isinstance(item, tuple):
             item, occurrence_to_find = item
+        elif isinstance(item, Struct):
+            for layer in self.layers:
+                if item is layer:
+                    return layer
+            else:
+                raise KeyError(f"Couldn't find any layer with the same id as {item}")
         else:
-            raise TypeError
+            raise TypeError('Invalid type for operation')
 
         occurrences = 0
         # Loop through the layers to find the required occurrence of item
@@ -107,10 +113,10 @@ class Message:
                            f"but expected to find at least {occurrence_to_find + 1}")
 
     def __contains__(self, item):
-        with suppress(KeyError):
-            return bool(self[item])
-
-        return item in self.layers
+        if isinstance(item, Struct) or issubclass(item, Struct):
+            with suppress(KeyError):
+                return bool(self[item])
+        return False
 
     def __len__(self):
         return len(self.layers)
