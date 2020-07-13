@@ -159,7 +159,8 @@ class Vector(_Sequence, VLA):
     def __init__(self, length: Union[_IntScalar, str],
                  field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
-                 validator: Optional[ValidatorType] = None):
+                 validator: Optional[ValidatorType] = None,
+                 modifier: int = 0):
         VLA.__init__(self, length)
         _Sequence.__init__(self, field_type=field_type, value=(), validator=validator)
         self.value = value

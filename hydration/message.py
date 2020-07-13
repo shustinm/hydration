@@ -195,4 +195,8 @@ class OpcodeField(MetaField):
         with suppress(IndexError):
             if not self.validator:
                 self.validator = as_validator(set(self.opcode_dictionary.values()))
-            self.value = self.opcode_dictionary[type(message[struct_index + 1])]
+            try:
+                self.value = self.opcode_dictionary[type(message[struct_index + 1])]
+            except KeyError:
+                raise ValueError(f'Class \'{message[struct_index + 1].__class__.__name__}\' doesn\'t '
+                                 f'exist in the opcode field\'s dictionary (in struct {struct.__class__.__name__})')

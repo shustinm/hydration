@@ -111,6 +111,12 @@ def test_opcode_field():
 
     assert (A() / B2() / C1())[B2].opcode == 3
 
+    class B3(h.Struct):
+        pass
+
+    with pytest.raises(ValueError):
+        A() / B3()
+
 
 def test_single():
     class T(h.Struct):

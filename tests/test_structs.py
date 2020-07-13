@@ -162,3 +162,17 @@ def test_from_bytes_hooks():
     r2 = Ronen.from_bytes(bytes(r))
 
     assert r2.arr == list(range(10))
+
+
+def test_super_after_custom_value():
+
+    class Gal(h.Struct):
+        x = h.UInt8(5)
+
+        def __init__(self, *args, **kwargs):
+            self.x = 10
+            super().__init__(*args, **kwargs)
+
+    g = Gal()
+    assert g.x == 10
+    assert bytes(g)[0] == 10

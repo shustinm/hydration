@@ -288,7 +288,7 @@ class Struct(metaclass=StructMeta):
             # Check if the field is a VLA
             if isinstance(field, VLA):
                 # Set VLA source to the new length
-                setattr(self, field.length_field_name, len(field))
+                setattr(self, field.length_field_name, len(field) + field.modifier)
         elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
         else:

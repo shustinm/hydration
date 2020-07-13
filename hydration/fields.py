@@ -70,13 +70,16 @@ class VLA(Field, ABC):
     def validator(self):
         return None
 
-    def __init__(self, field: Union[Field, str]):
+    def __init__(self, field: Union[Field, str], length_modifier: int = 0):
         """
         The goal, in the end, is to have the name of the scalar that contains the length.
         If not given in the __init__, StructMeta will fill the name itself.
         :param field: The field (from the struct or its' name)
+        :param length_modifier: The difference between the length field and the actual vector length
         """
+
         self.length = 0
+        self.modifier = length_modifier
         if isinstance(field, str):
             self.length_field_name = field
         else:
@@ -84,7 +87,7 @@ class VLA(Field, ABC):
             self.length_field_obj = field
 
     def __len__(self):
-        return int(self.length)
+        return int(self.length) + self.modifier
 
     def find_and_set_field_name(self, attributes):
         for attr_name, attr in attributes.items():
