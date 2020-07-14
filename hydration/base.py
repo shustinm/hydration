@@ -221,7 +221,7 @@ class Struct(metaclass=StructMeta):
             obj.invoke_from_bytes_hooks(field)
 
             if isinstance(field, VLA):
-                field.length = int(getattr(obj, field.length_field_name))
+                field.length = int(getattr(obj, field.length_field_name).value) + field.modifier
                 field.from_bytes(data)
                 data = data[len(bytes(field)):]
             else:
@@ -288,7 +288,7 @@ class Struct(metaclass=StructMeta):
             # Check if the field is a VLA
             if isinstance(field, VLA):
                 # Set VLA source to the new length
-                setattr(self, field.length_field_name, len(field) + field.modifier)
+                setattr(self, field.length_field_name, len(field))
         elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
         else:

@@ -161,7 +161,7 @@ class Vector(_Sequence, VLA):
                  value: Optional[Sequence[Any]] = (),
                  validator: Optional[ValidatorType] = None,
                  modifier: int = 0):
-        VLA.__init__(self, length)
+        VLA.__init__(self, length, modifier)
         _Sequence.__init__(self, field_type=field_type, value=(), validator=validator)
         self.value = value
 

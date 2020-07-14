@@ -138,26 +138,18 @@ def test_modified_vector():
 
     test_data = b'123'
 
-    class Idan(h.Struct):
+    class Ahal(h.Struct):
         magic = h.UInt32(0xDEADBEEF)
         message_length = h.InclusiveLengthField(h.UInt8)
-
-    class Ahal(h.Struct):
-        payload = h.Vector('message_length', h.UInt8)
+        some_data = h.Array(5, h.UInt8, fill=True)
+        payload = h.Vector('message_length', h.UInt8, modifier=-15)
         other_data = h.Array(5, h.UInt8, fill=True)
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.payload = test_data
-
-    msg = Idan() / Ahal()
-    assert msg[Idan].message_length == 4 + 1 + len(test_data) + 5
+    msg = h.Message(Ahal(payload=test_data))
+    assert msg[Ahal].message_length == 5 + len(test_data) + 10
 
     serialized = bytes(msg)
-    assert serialized[4] == 4 + 1 + len(test_data) + 5
+    assert serialized[4] == 5 + len(test_data) + 10
 
-    hdr = Idan.from_bytes(serialized)
-    serialized = serialized[len(hdr):]
-
-    body = Ahal.from_bytes(serialized)
-    assert body.payload == [int(x) for x in test_data]
+    parsed = Ahal.from_bytes(serialized)
+    assert parsed.payload.value == [int(x) for x in test_data]

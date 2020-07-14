@@ -87,7 +87,10 @@ class VLA(Field, ABC):
             self.length_field_obj = field
 
     def __len__(self):
-        return int(self.length) + self.modifier
+        return int(self.length)
+
+    def size(self):
+        return len(self) + self.modifier
 
     def find_and_set_field_name(self, attributes):
         for attr_name, attr in attributes.items():
