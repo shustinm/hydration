@@ -280,7 +280,7 @@ class Struct(metaclass=StructMeta):
         :param value:   The value to set
         :return:        None
         """
-        if key in self._field_names and not isinstance(value, (Field, StructMeta)):
+        if key in self._field_names and not isinstance(value, (Field, StructMeta, Struct)):
             field = getattr(self, key)
             with suppress(AttributeError):
                 field.validator.validate(value)

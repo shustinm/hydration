@@ -39,3 +39,13 @@ def test_property_override_nested_struct():
         # noinspection PyUnusedLocal
         class Hand(h.Struct):
             card1 = Card()
+
+
+def test_entanglement():
+    l1 = Log()
+    l2 = Log()
+
+    assert l1.time is not l2.time
+
+    l1.time.time = 4
+    assert l2.time.time == 3
