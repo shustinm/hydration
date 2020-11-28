@@ -54,7 +54,10 @@ class Scalar(Field, Real):
         self._value = value
 
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__qualname__, self.value)
+        rep = ['{}({})'.format(self.__class__.__qualname__, self.value)]
+        if self.endianness_format:
+            rep.append(f', endianness_format={Endianness(self.endianness_format).name}')
+        return ''.join(rep)
 
     def __str__(self):
         return repr(self)
@@ -107,7 +110,11 @@ class Scalar(Field, Real):
     def __bytes__(self) -> bytes:
         format_string = '{}{}'.format(self.endianness_format,
                                       self.scalar_format)
-        return struct.pack(format_string, self.value)
+        try:
+            return struct.pack(format_string, self.value)
+        except struct.error as e:
+            raise ValueError(f"Error packing {repr(self)}:\n"
+                             f"struct.pack({format_string}, {self.value}) error: {str(e)}")
 
     def __int__(self) -> int:
         return int(self.value)
@@ -267,7 +274,7 @@ class Enum(Field):
                  enum_class: Type[enum.IntEnum],
                  value: Optional[enum.IntEnum] = None):
         super().__init__()
-        self.type = as_obj(scalar_type)
+        self.type: _IntScalar = as_obj(scalar_type)
         self.type.validator = as_validator(enum_class)
         if self.type.value != 0:
             raise ValueError('Do not set a value in the given scalar type: {}'.format(scalar_type))
@@ -300,7 +307,10 @@ class Enum(Field):
         return len(self.type)
 
     def __bytes__(self) -> bytes:
-        return bytes(self.type)
+        try:
+            return bytes(self.type)
+        except ValueError as e:
+            raise ValueError(f'Error serializing {repr(self)}:\n{str(e)}')
 
     def from_bytes(self, data: bytes):
         self.type.from_bytes(data)

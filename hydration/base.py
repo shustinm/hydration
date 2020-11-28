@@ -7,7 +7,7 @@ from pyhooks import Hook, precall_register, postcall_register
 from typing import Callable, List, Iterable, Optional
 
 from .helpers import as_obj, assert_no_property_override, as_type
-from .scalars import Scalar
+from .scalars import Scalar, Enum
 from .fields import Field, VLA
 from .endianness import Endianness
 
@@ -24,9 +24,9 @@ class StructMeta(type):
         for base in filter(lambda x: issubclass(x, Struct), bases):
             for field_name in base._field_names:
                 if hasattr(base, '_footer') and base._footer:
-                    footer_fields[field_name] = getattr(base, field_name)
+                    footer_fields[field_name] = copy.deepcopy(getattr(base, field_name))
                 else:
-                    base_fields[field_name] = getattr(base, field_name)
+                    base_fields[field_name] = copy.deepcopy(getattr(base, field_name))
 
         # Check to see if any of the current attributes have already been defined
         for field_name in attributes.keys():
@@ -76,10 +76,16 @@ class StructMeta(type):
                 field_obj.find_and_set_field_name(attributes)
 
             # If endianness was given, change endianness (only if it's default)
-            if isinstance(field_obj, Scalar) and endianness:
-                # Check if the endianness_format was not already set
-                if not field_obj._endianness_format:
-                    field_obj.endianness_format = endianness
+            if endianness:
+                # In case the field IS a scalar
+                if isinstance(field_obj, Scalar):
+                    # Check if the endianness_format was not already set
+                    if not field_obj._endianness_format:
+                        field_obj.endianness_format = endianness
+                # In case the field CONTAINS a scalar
+                elif isinstance(field_obj, Enum):
+                    if not field_obj.type._endianness_format:
+                        field_obj.type.endianness_format = endianness
 
         return super().__new__(mcs, name, bases, attributes)
 
@@ -199,7 +205,7 @@ class Struct(metaclass=StructMeta):
         try:
             return b''.join(map(bytes, self._fields))
         except struct.error as e:
-            raise ValueError(str(e))
+            raise ValueError(str(e)) from e
 
     pre_bytes_hook = precall_register('__bytes__')
     post_bytes_hook = postcall_register('__bytes__')
