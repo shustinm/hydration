@@ -194,7 +194,10 @@ class IPv4(Array):
 
     @_Sequence.value.setter
     def value(self, value: str):
-        x = value.split('.')
+        if isinstance(value, str):
+            x = value.split('.')
+        else:
+            x = tuple(iter(value))
         if len(x) != 4:
             raise ValueError('IP length mismatch. Expected 4, got {}'.format(len(x)))
         self.data = list(int(z) for z in x)
