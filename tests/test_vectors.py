@@ -73,6 +73,10 @@ def test_ipv4():
         ip = h.IPv4()
 
     assert str(Venice().ip) == '0.0.0.0'
+    assert Venice.from_bytes(bytes(Venice(ip='127.0.0.1'))) == Venice(ip='127.0.0.1')
+
+    with pytest.raises(ValueError):
+        Venice.from_bytes(bytes(Venice(ip='127.0.0.1'))[:-1])
 
 
 def test_type_field():
