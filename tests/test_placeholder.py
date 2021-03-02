@@ -16,7 +16,7 @@ class IDVector(h.Struct):
 
     @h.from_bytes_hook(vec)
     def set_vec_field(self):
-        d = {len(x()): x for x in (h.UInt8, h.UInt16, h.UInt32, h.UInt32)}
+        d = {len(x()): x for x in (h.UInt8, h.UInt16, h.UInt32, h.UInt64)}
         self.vec.type = d[int(self.id_len)]()
 
 

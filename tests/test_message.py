@@ -1,3 +1,5 @@
+from zlib import crc32
+
 import pytest
 
 import hydration as h
@@ -35,6 +37,9 @@ def test_message():
 
     with pytest.raises(TypeError):
         assert 3 not in x
+
+    x[last] = Tomer(b=124)
+    assert x[-1].b == 124
 
 
 def test_bytes_suffix():
@@ -111,6 +116,12 @@ def test_opcode_field():
 
     assert (A() / B2() / C1())[B2].opcode == 3
 
+    m = A() / B1()
+    assert m[A].opcode == 1
+
+    m[B1] = B2()
+    assert m[A].opcode == 2
+
 
 def test_single():
     class T(h.Struct):
@@ -119,3 +130,26 @@ def test_single():
 
     t = h.Message(T())
     assert t[T].x == 11
+
+
+class _CRCField(h.message.MetaField):
+    def __init__(self):
+        # Only UInt32 is supported
+        super().__init__(h.UInt32)
+
+    def update(self, message: h.Message, struct: h.Struct, struct_index: int):
+        self.value = crc32(bytes(message[:struct_index + 1])[:-4])
+
+
+class Header(h.Struct, endianness=h.BigEndian):
+    magic = h.UInt32(0x01052000)
+    body_length = h.ExclusiveLengthField(h.UInt16)
+
+
+class Footer(h.Struct, endianness=h.BigEndian):
+    crc = _CRCField()
+
+
+def test_crc():
+    msg = Header(magic=0x01052000) / Footer()
+    assert crc32(bytes(msg)[:-4]) == msg[Footer].crc.value

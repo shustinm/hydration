@@ -34,9 +34,9 @@ class Message:
 
     def _update_metas(self):
         """
-        Iterate over the layers in reversed order, and update all their MetaFields
+        Iterate over the layers, and update all their MetaFields
         """
-        for index, layer in reversed(list(enumerate(self.layers))):
+        for index, layer in list(enumerate(self.layers)):
             if isinstance(layer, bytes):
                 continue
 
@@ -70,17 +70,10 @@ class Message:
     def __iter__(self):
         return iter(self.layers)
 
-    def __getitem__(self, item):
-        # Index lookup
-        if isinstance(item, int):
-            return self.layers[item]
-        # Slice lookup, should still return a Message
-        elif isinstance(item, slice):
-            m = Message()
-            # Copy the layers without calling __init__, avoids invoking update_metas
-            m.layers = self.layers[item]
-            return m
-
+    def index(self, item):
+        # Standard index types
+        if isinstance(item, (int, slice)):
+            return item
         # Simple class lookup
         if inspect.isclass(item):
             occurrence_to_find = 0
@@ -89,20 +82,20 @@ class Message:
         elif isinstance(item, tuple):
             item, occurrence_to_find = item
         elif isinstance(item, Struct):
-            for layer in self.layers:
+            for index, layer in enumerate(self.layers):
                 if item is layer:
-                    return layer
+                    return index
             else:
-                raise KeyError(f"Couldn't find any layer with the same id as {item}")
+                raise KeyError(f"Couldn't find any layer that is {item}")
         else:
             raise TypeError('Invalid type for operation')
 
         occurrences = 0
         # Loop through the layers to find the required occurrence of item
-        for layer in self.layers:
+        for index, layer in enumerate(self.layers):
             if isinstance(layer, item):
                 if occurrence_to_find == occurrences:
-                    return layer
+                    return index
                 else:
                     occurrences += 1
 
@@ -111,6 +104,29 @@ class Message:
         else:
             raise KeyError(f"Found only {occurrences + 1} occurrences of {item}, "
                            f"but expected to find at least {occurrence_to_find + 1}")
+
+    def __getitem__(self, item):
+        # Single item lookup (class and/or index based)
+        if isinstance(item, (int, tuple, Struct)) or inspect.isclass(item):
+            return self.layers[self.index(item)]
+        # Slice lookup, should still return a Message
+        elif isinstance(item, slice):
+            return Message(*self.layers[item], update_metadata=False)
+        else:
+            raise TypeError
+
+    def __setitem__(self, key, value, update_metas=True):
+        # Single value insertion (class and/or index based)
+        if isinstance(key, (int, tuple, Struct)) or inspect.isclass(key):
+            self.layers[self.index(key)] = value
+        elif isinstance(key, slice):
+            slice_length = (key.start - key.stop) / key.step
+            if slice_length != len(value):
+                raise ValueError(f'Length of assigned value ({len(value)}) '
+                                 f'doesn\'t match the length of the slice ({slice_length})')
+            self.layers[key] = value
+        if update_metas:
+            self._update_metas()
 
     def __contains__(self, item):
         if isinstance(item, Struct) or issubclass(item, Struct):

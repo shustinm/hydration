@@ -8,7 +8,7 @@ from typing import Callable, List, Iterable, Optional
 
 from .helpers import as_obj, assert_no_property_override, as_type
 from .scalars import Scalar, Enum
-from .fields import Field, VLA
+from .fields import Field, VLA, FieldPlaceholder
 from .endianness import Endianness
 
 illegal_field_names = ['value', 'validate', '_fields']
@@ -222,9 +222,15 @@ class Struct(metaclass=StructMeta):
 
         obj = cls(*args)
 
-        for field in obj._fields:
+        for field_name in obj._field_names:
+
+            # Get field for current field name
+            field = getattr(obj, field_name)
 
             obj.invoke_from_bytes_hooks(field)
+
+            # Bytes hooks can change the field object, so get it again by name
+            field = getattr(obj, field_name)
 
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
@@ -295,6 +301,14 @@ class Struct(metaclass=StructMeta):
             if isinstance(field, VLA):
                 # Set VLA source to the new length
                 setattr(self, field.length_field_name, len(field))
+        # Overriding fields but saving the hooks
+        elif key in self._field_names:
+            # Save the hooks from the field
+            hooks = getattr(getattr(self, key), '_from_bytes_hooks', [])
+            # Set the field to the new value
+            super().__setattr__(key, value)
+            # Inject the old hooks to the new field
+            setattr(getattr(self, key), '_from_bytes_hooks', hooks)
         elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
         else:
