@@ -136,3 +136,39 @@ def test_array_deserialization():
     d = Data(data=[3] * 10)
     b = bytes(d)
     assert Data.from_bytes(b).data == d.data
+
+
+def test_dynamic_vec_size():
+
+    class Atedgi(h.Struct):
+        this = h.UInt8(1)
+        aviv = h.FieldPlaceholder()
+
+        def __init__(self, this=1, *args, **kwargs):
+            self.this = this
+            self.set_vec_field()
+            super().__init__(*args, **kwargs)
+
+        @h.from_bytes_hook(aviv)
+        def set_vec_field(self):
+            d = {len(x()): x for x in (h.UInt8, h.UInt16, h.UInt32, h.UInt64)}
+            self.aviv = d[self.this.value]()
+
+    class Maor(h.Struct):
+         vec_len = h.UInt16()
+         vec = h.Vector(vec_len, Atedgi)
+
+    sizes = (1, 2, 4, 8)
+    from random import randint
+    x = [Atedgi(this=size, aviv=5) for size in sizes]
+    for obj, size in zip(x, sizes):
+        assert len(obj) == size + 1
+
+    real_deal = Maor(vec=x)
+
+    identical = Maor.from_bytes(bytes(real_deal))
+
+    assert real_deal.vec.type == identical.vec.type
+
+    for a1, a2 in zip(real_deal.vec.value, identical.vec.value):
+        assert a1.aviv == a2.aviv
