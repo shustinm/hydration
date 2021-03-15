@@ -1,7 +1,8 @@
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from typing import List, Union, Type, Mapping
+from typing import List, Union, Type, Mapping, Callable
+from bidict import bidict, ValueDuplicationError
 
 from hydration.helpers import as_obj
 from .base import Struct
@@ -137,6 +138,95 @@ class Message:
     def __len__(self):
         return len(self.layers)
 
+    @classmethod
+    def from_bytes(cls, header_class: Type[Struct], data: bytes, *additional_classes: List[Type[Struct]]):
+        """
+        Create a message from bytes data, using a header with an OpcodeField.
+        
+        :param header_class: A struct class which is the header of the message
+        :param data: Data containing the message (in bytes)
+        :param additional_classes: Additional classes to deserialize after the header and the body
+        :return: A message created from `data`,based on `header_class` and `additional_classes`
+        """
+
+        # Find the opcode field in the header
+        for opcode_name, opcode_field in as_obj(header_class):
+            if isinstance(opcode_field, OpcodeField):
+                break
+        else:
+            raise ValueError(f'Header {header_class.__name__} must have an opcode field in order to deserialize a message')
+
+        # Create the header object
+        header = header_class.from_bytes(data)
+        data = data[len(header):]
+
+        # Extract body class from header's opcode field
+        header_opcode_value = getattr(header, opcode_name).value
+        body_class: Type[Struct] = bidict(opcode_field.opcode_dictionary).inverse[header_opcode_value]
+
+        # Create the body
+        body = body_class.from_bytes(data)
+        data = data[len(body):]
+        additional_layers = []
+
+        # Add the additional classes
+        for additional_struct in additional_classes:
+            try:
+                # Try to deserialize the struct as an header, if it doesn't have an OpcodeField
+                # it will raise a ValueError and we will treat it as a normal struct
+                msg = Message.from_bytes(additional_struct, data)
+                additional_layers.extend(msg.layers)
+                data = data[msg.size:]
+            except ValueError:
+                obj = additional_struct.from_bytes(data)
+                additional_layers.append(obj)
+                data = data[len(obj):]
+
+        return cls(header, body, *additional_layers, update_metadata=False)
+
+    @classmethod
+    def from_stream(cls, header_class: Type[Struct], read_func: Callable[[int], bytes], *additional_classes: List[Type[Struct]]):
+        """
+        Create a message from bytes data, using a header with an OpcodeField.
+        
+        :param header_class: A struct class which is the header of the message
+        :param read_func: The stream's reader function
+        The function needs to receive an int as a positional parameter and return a bytes object.
+        :param additional_classes: Additional classes to deserialize after the header and the body
+        :return: A message created from `read_func`,based on `header_class` and `additional_classes`
+        """
+
+        # Find the opcode field in the header
+        for opcode_name, opcode_field in as_obj(header_class):
+            if isinstance(opcode_field, OpcodeField):
+                break
+        else:
+            raise ValueError(f'Header {header_class.__name__} must have an opcode field in order to deserialize a message')
+
+        # Create the header object
+        header = header_class.from_stream(read_func)
+
+        # Extract body class from header's opcode field
+        header_opcode_value = getattr(header, opcode_name).value
+        body_class: Type[Struct] = bidict(opcode_field.opcode_dictionary).inverse[header_opcode_value]
+
+        # Create the body
+        body = body_class.from_stream(read_func)
+        additional_layers = []
+
+        # Add the additional classes
+        for additional_struct in additional_classes:
+            try:
+                # Try to deserialize the struct as an header, if it doesn't have an OpcodeField
+                # it will raise a ValueError and we will treat it as a normal struct
+                msg = Message.from_stream(additional_struct, read_func)
+                additional_layers.extend(msg.layers)
+            except ValueError:
+                obj = additional_struct.from_stream(read_func)
+                additional_layers.append(obj)
+
+        return cls(header, body, *additional_layers, update_metadata=False)
+
     @property
     def size(self):
         # layers are structs or bytes, so use len instead of size
@@ -186,6 +276,9 @@ class MetaField(Field, ABC):
     def from_bytes(self, data: bytes):
         return self.data_field.from_bytes(data)
 
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        return self.data_field.from_stream(read_func)
+
     @abstractmethod
     def update(self, message: Message, struct: Struct, struct_index: int):
         raise NotImplementedError
@@ -206,6 +299,12 @@ class OpcodeField(MetaField):
     def __init__(self, data_field: FieldType, opcode_dictionary: Mapping):
         super().__init__(data_field)
         self.opcode_dictionary = opcode_dictionary
+        
+        try:
+            # Validate that there are no duplicate opcodes
+            bidict(opcode_dictionary)
+        except ValueDuplicationError:
+            raise ValueError("Opcode values must be unique")
 
     def update(self, message: Message, struct: Struct, struct_index: int):
         with suppress(IndexError):

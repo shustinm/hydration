@@ -3,6 +3,8 @@ import enum
 import pytest
 import hydration as h
 
+from .utils import as_reader
+
 
 class Tst(h.Struct):
     a = h.UInt8(validator=0)
@@ -16,6 +18,11 @@ def test_init():
 def test_from_bytes():
     with pytest.raises(ValueError):
         Tst.from_bytes(b'\x02')
+    
+
+def test_from_stream():
+    with pytest.raises(ValueError):
+        Tst.from_stream(as_reader(b'\x02'))
 
 
 def test_bad_struct():

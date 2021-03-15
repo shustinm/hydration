@@ -1,6 +1,7 @@
 import pytest
-
 import hydration as h
+
+from .utils import as_reader
 
 
 class Garzon(h.Struct):
@@ -27,6 +28,7 @@ def test_vector():
     x = Shine()
     new_x = Shine.from_bytes(bytes(x))
     assert x == new_x
+    assert x == Shine.from_stream(as_reader(bytes(x)))
 
 
 def test_vector_len_update():
@@ -52,6 +54,7 @@ def test_bad_val():
 def test_array():
     x = Isaac()
     assert x == Isaac.from_bytes(bytes(x))
+    assert x == Isaac.from_stream(as_reader(bytes(x)))
     assert bytes(x) == b'\x01\x02\x03\x05'
 
 
@@ -74,9 +77,13 @@ def test_ipv4():
 
     assert str(Venice().ip) == '0.0.0.0'
     assert Venice.from_bytes(bytes(Venice(ip='127.0.0.1'))) == Venice(ip='127.0.0.1')
+    assert Venice.from_stream(as_reader(bytes(Venice(ip='127.0.0.1')))) == Venice(ip='127.0.0.1')
 
     with pytest.raises(ValueError):
         Venice.from_bytes(bytes(Venice(ip='127.0.0.1'))[:-1])
+
+    with pytest.raises(ValueError):
+        Venice.from_stream(as_reader(bytes(Venice(ip='127.0.0.1'))[:-1]))
 
 
 def test_type_field():
@@ -136,9 +143,10 @@ def test_array_deserialization():
     d = Data(data=[3] * 10)
     b = bytes(d)
     assert Data.from_bytes(b).data == d.data
+    assert Data.from_stream(as_reader(b)).data == d.data
 
 
-def test_dynamic_vec_size():
+def test_vector_with_dynamic_item_size():
 
     class Atedgi(h.Struct):
         this = h.UInt8(1)
@@ -153,7 +161,7 @@ def test_dynamic_vec_size():
         def set_vec_field(self):
             d = {len(x()): x for x in (h.UInt8, h.UInt16, h.UInt32, h.UInt64)}
             self.aviv = d[self.this.value]()
-
+        
     class Maor(h.Struct):
          vec_len = h.UInt16()
          vec = h.Vector(vec_len, Atedgi)
@@ -165,9 +173,14 @@ def test_dynamic_vec_size():
         assert len(obj) == size + 1
 
     real_deal = Maor(vec=x)
-
     identical = Maor.from_bytes(bytes(real_deal))
+    assert real_deal.vec.type == identical.vec.type
 
+    for a1, a2 in zip(real_deal.vec.value, identical.vec.value):
+        assert a1.aviv == a2.aviv
+
+    real_deal = Maor(vec=x)
+    identical = Maor.from_stream(as_reader(bytes(real_deal)))
     assert real_deal.vec.type == identical.vec.type
 
     for a1, a2 in zip(real_deal.vec.value, identical.vec.value):

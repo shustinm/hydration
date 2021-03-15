@@ -258,21 +258,18 @@ class Struct(metaclass=StructMeta):
         :return: The deserialized object.
         """
 
+        print(f'Using `from_stream` in {cls.__name__}')
         obj = cls(*args)
 
         for field in obj._fields:
-
             obj.invoke_from_bytes_hooks(field)
 
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
-                data = read_func(field.length)
-                field.from_bytes(data)
+                field.from_stream(read_func)
             else:
-                read_size = field.size
+                field.from_stream(read_func)
 
-                data = read_func(read_size)
-                field.value = field.from_bytes(data).value
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 

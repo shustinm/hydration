@@ -1,7 +1,7 @@
 import copy
 from abc import ABC
 from collections import UserList
-from typing import Sequence, Optional, Any, Union, Iterable
+from typing import Sequence, Optional, Any, Union, Iterable, Callable
 from itertools import islice
 
 from .base import Struct
@@ -55,6 +55,11 @@ class _Sequence(UserList, Field, ABC):
         self.value = tuple(field_type.from_bytes(chunk).value for chunk in byte_chunks(data, len(field_type)))
         return self
 
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        field_type = copy.deepcopy(self.type)
+        self.value = tuple(field_type.from_stream(read_func) for _ in range(len(self)))
+        return self
+    
     def __str__(self):
         return '{}{}'.format(self.__class__.__qualname__, self.value)
 
@@ -183,6 +188,11 @@ class Vector(_Sequence, VLA):
                 data = data[len(bytes(next_obj)):]
             self.value = val
             return self
+
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        print(f'Using `from_stream` in {self.__class__.__name__}')
+        self.value = [self.type.from_stream(read_func) for _ in range(len(self))]
+        return self
 
     def __len__(self) -> int:
         return VLA.__len__(self)

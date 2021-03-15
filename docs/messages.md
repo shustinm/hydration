@@ -93,3 +93,38 @@ Header3:
 Body3:
 	data3:	UInt64(40)
 ```
+
+Once you have an `OpcodeField` in your message, you can also construct a message straight from bytes data.<br>
+Using the same example as above:
+
+```pycon
+>>> print(bytes(Header3() / Body2()))
+b'\x01\x00\x00\x00\x14\x00\x00\x00'
+>>> print(Message.from_bytes(Header3, b'\x01\x00\x00\x00\x14\x00\x00\x00'))
+Header3:
+    opcode: UInt32(1)
+Body2:
+    data: UInt32(20)
+```
+
+You can also deserialize more structs than just the header using the `Message.from_bytes` function, for example:
+
+```python
+class Footer(Struct):
+    x = UInt32()
+```
+```pycon
+>>> print(bytes(Header3() / Body2() / Footer()))
+b'\x01\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00'
+>>> print(Message.from_bytes(Header3, b'\x01\x00\x00\x00\x14\x00\x00\x00\x00\x00\x00\x00', Footer))
+Header3:
+    opcode: UInt32(1)
+Body2:
+    data: UInt32(20)
+Footer:
+    x: UInt32(0)
+```
+
+* You can also use the `from_stream` function instead `from_bytes`.
+* You can pass more than one footer to the `Message.from_bytes` or `Message.from_stream` functions.
+* You can pass footers that also has an `OpcodeField` in them and it will deserialize it as a message.

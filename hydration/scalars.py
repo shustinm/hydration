@@ -128,6 +128,10 @@ class Scalar(Field, Real):
         self.value = struct.unpack(format_string, data)[0]
         return self
 
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        print(f'Using `from_stream` in {self.__class__.__name__}')
+        return self.from_bytes(read_func(len(self)))
+
     def __trunc__(self):
         return trunc(self.value)
 
@@ -316,6 +320,9 @@ class Enum(Field):
         self.type.from_bytes(data)
         self.value = self.type.value
         return self
+
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        return self.from_bytes(read_func(len(self)))
 
     @property
     def name(self):
