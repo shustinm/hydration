@@ -129,7 +129,6 @@ class Scalar(Field, Real):
         return self
 
     def from_stream(self, read_func: Callable[[int], bytes]):
-        print(f'Using `from_stream` in {self.__class__.__name__}')
         return self.from_bytes(read_func(len(self)))
 
     def __trunc__(self):

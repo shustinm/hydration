@@ -57,7 +57,7 @@ class _Sequence(UserList, Field, ABC):
 
     def from_stream(self, read_func: Callable[[int], bytes]):
         field_type = copy.deepcopy(self.type)
-        self.value = tuple(field_type.from_stream(read_func) for _ in range(len(self)))
+        self.value = tuple(field_type.from_stream(read_func).value for _ in range(len(self)))
         return self
     
     def __str__(self):
@@ -190,7 +190,9 @@ class Vector(_Sequence, VLA):
             return self
 
     def from_stream(self, read_func: Callable[[int], bytes]):
-        print(f'Using `from_stream` in {self.__class__.__name__}')
+        if isinstance(self.type, Field):
+            return super().from_bytes(read_func(len(self) * len(self.type)))
+
         self.value = [self.type.from_stream(read_func) for _ in range(len(self))]
         return self
 

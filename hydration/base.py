@@ -8,7 +8,7 @@ from typing import Callable, List, Iterable, Optional
 
 from .helpers import as_obj, assert_no_property_override, as_type
 from .scalars import Scalar, Enum
-from .fields import Field, VLA, FieldPlaceholder
+from .fields import Field, VLA
 from .endianness import Endianness
 
 illegal_field_names = ['value', 'validate', '_fields']
@@ -258,11 +258,17 @@ class Struct(metaclass=StructMeta):
         :return: The deserialized object.
         """
 
-        print(f'Using `from_stream` in {cls.__name__}')
         obj = cls(*args)
 
-        for field in obj._fields:
+        for field_name in obj._field_names:
+
+            # Get field for current field name
+            field = getattr(obj, field_name)
+
             obj.invoke_from_bytes_hooks(field)
+
+            # Bytes hooks can change the field object, so get it again by name
+            field = getattr(obj, field_name)
 
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
