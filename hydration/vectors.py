@@ -50,11 +50,6 @@ class _Sequence(UserList, Field, ABC):
 
         return bytes(result)
 
-    def from_bytes(self, data: bytes):
-        field_type = copy.deepcopy(self.type)
-        self.value = tuple(field_type.from_bytes(chunk).value for chunk in byte_chunks(data, len(field_type)))
-        return self
-
     def from_stream(self, read_func: Callable[[int], bytes]):
         field_type = copy.deepcopy(self.type)
         self.value = tuple(field_type.from_stream(read_func).value for _ in range(len(self)))
@@ -116,7 +111,7 @@ class _Sequence(UserList, Field, ABC):
         self.value = self.data
 
 
-class Array(_Sequence):
+class Array(_Sequence, ABC):
     def __init__(self, length: int,
                  field_type: FieldType = UInt8,
                  value: Optional[Sequence[Any]] = (),
@@ -177,21 +172,21 @@ class Vector(_Sequence, VLA):
         # This assumes that the Struct will update the length field's value
         self.length = len(value)
 
-    def from_bytes(self, data: bytes):
-        if isinstance(self.type, Field):
-            return super().from_bytes(data[:len(self) * len(self.type)])
-        else:
-            val = []
-            for _ in range(len(self)):
-                next_obj = self.type.from_bytes(data)
-                val.append(next_obj)
-                data = data[len(bytes(next_obj)):]
-            self.value = val
-            return self
+    # def from_bytes(self, data: bytes):
+    #     if isinstance(self.type, Field):
+    #         return super().from_bytes(data[:len(self) * len(self.type)])
+    #     else:
+    #         val = []
+    #         for _ in range(len(self)):
+    #             next_obj = self.type.from_bytes(data)
+    #             val.append(next_obj)
+    #             data = data[len(bytes(next_obj)):]
+    #         self.value = val
+    #         return self
 
     def from_stream(self, read_func: Callable[[int], bytes]):
         if isinstance(self.type, Field):
-            return super().from_bytes(read_func(len(self) * len(self.type)))
+            return super().from_stream(read_func)
 
         self.value = [self.type.from_stream(read_func) for _ in range(len(self))]
         return self
