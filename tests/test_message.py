@@ -1,8 +1,9 @@
+import pytest
+import hydration as h
+
 from zlib import crc32
 
-import pytest
-
-import hydration as h
+from .utils import as_reader
 
 
 class Tomer(h.Struct):
@@ -89,7 +90,6 @@ def test_length_fields():
 
 
 def test_opcode_field():
-
     class C1(h.Struct):
         x = h.UInt32
 
@@ -153,3 +153,140 @@ class Footer(h.Struct, endianness=h.BigEndian):
 def test_crc():
     msg = Header(magic=0x01052000) / Footer()
     assert crc32(bytes(msg)[:-4]) == msg[Footer].crc.value
+
+
+class MessageBody1(h.Struct):
+    x = h.UInt16(0x1D14)
+
+
+class MessageBody2(h.Struct):
+    y = h.UInt32(0x06072001)
+
+
+class MessageHeader(h.Struct):
+    magic = h.UInt32(0xDEADBEEF)
+    opcode = h.OpcodeField(h.UInt16, {MessageBody1: 0x00, MessageBody2: 0x01})
+
+
+class MessageFooter(h.Struct):
+    magic = h.UInt32(0x000C0FEE)
+
+
+class AnotherFooter(h.Struct):
+    another_magic = h.UInt32(0x01052000)
+
+
+class FooterBody1(h.Struct):
+    x = h.UInt8(0xFF)
+
+
+class FooterBody2(h.Struct):
+    y = h.UInt64(0x0123456789ABCDEF)
+
+
+class FooterThatIsAlsoHeader(h.Struct):
+    magic = h.UInt32(0x09012001)
+    my_opcode = h.OpcodeField(h.UInt16, {FooterBody1: 0x02, FooterBody2: 0x00})
+
+
+def test_message_deserialization():
+    msg = MessageHeader() / MessageBody1()
+    assert msg[MessageHeader].opcode == 0
+    assert h.Message.from_bytes(bytes(msg), MessageHeader) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader) == msg
+
+    msg = MessageHeader() / MessageBody2()
+    assert msg[MessageHeader].opcode == 1
+    assert h.Message.from_bytes(bytes(msg), MessageHeader) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader) == msg
+
+
+def test_message_deserialization_with_footer():
+    msg = MessageHeader() / MessageBody1() / MessageFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter) == msg
+
+    msg = MessageHeader() / MessageBody2() / MessageFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter) == msg
+
+
+def test_message_deserialization_with_multiple_footers():
+    msg = MessageHeader() / MessageBody1() / MessageFooter() / AnotherFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter, AnotherFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter, AnotherFooter) == msg
+
+    msg = MessageHeader() / MessageBody2() / MessageFooter() / AnotherFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter, AnotherFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter, AnotherFooter) == msg
+
+
+def test_message_deserialization_with_multiple_footers_and_multiple_opcodes():
+    msg = MessageHeader() / MessageBody1() / MessageFooter() / FooterThatIsAlsoHeader() / FooterBody1() / AnotherFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter, FooterThatIsAlsoHeader, AnotherFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter, FooterThatIsAlsoHeader,
+                                 AnotherFooter) == msg
+
+    msg = MessageHeader() / MessageBody2() / MessageFooter() / FooterThatIsAlsoHeader() / FooterBody1() / AnotherFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter, FooterThatIsAlsoHeader, AnotherFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter, FooterThatIsAlsoHeader,
+                                 AnotherFooter) == msg
+
+    msg = MessageHeader() / MessageBody1() / MessageFooter() / FooterThatIsAlsoHeader() / FooterBody2() / AnotherFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter, FooterThatIsAlsoHeader, AnotherFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter, FooterThatIsAlsoHeader,
+                                 AnotherFooter) == msg
+
+    msg = MessageHeader() / MessageBody2() / MessageFooter() / FooterThatIsAlsoHeader() / FooterBody2() / AnotherFooter()
+    assert h.Message.from_bytes(bytes(msg), MessageHeader, MessageFooter, FooterThatIsAlsoHeader, AnotherFooter) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), MessageHeader, MessageFooter, FooterThatIsAlsoHeader,
+                                 AnotherFooter) == msg
+
+
+def test_message_deserialization_with_missing_opcode_field():
+    class MissingOpcode(h.Struct):
+        x = h.UInt16()
+
+    with pytest.raises(AttributeError):
+        h.Message.from_bytes(bytes(MissingOpcode()), MissingOpcode)
+
+    with pytest.raises(AttributeError):
+        h.Message.from_stream(as_reader(bytes(MissingOpcode())), MissingOpcode)
+
+
+def test_message_deserialization_with_recursive_opcode_field():
+    class LiorN(h.Struct):
+        y = h.UInt32(0x16051999)
+
+    class Fuad(h.Struct):
+        x = h.UInt32(0x17082001)
+
+    class Ralon(h.Struct):
+        z = h.UInt32(0x29062000)
+
+    class Sherman(h.Struct):
+        a = h.UInt32(0x15101996)
+
+    class H3(h.Struct):
+        opcode = h.OpcodeField(h.UInt16, {Fuad: 0x02, LiorN: 0x03})
+
+    class H2(h.Struct):
+        opcode = h.OpcodeField(h.UInt16, {H3: 0x00, Ralon: 0x01})
+
+    class H1(h.Struct):
+        opcode = h.OpcodeField(h.UInt16, {H2: 0x00, Sherman: 0x01})
+
+    class F1(h.Struct):
+        damn = h.UInt32(0xFACEB00C)
+
+    msg = H1() / Sherman() / F1()
+    assert h.Message.from_bytes(bytes(msg), H1, F1) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), H1, F1) == msg
+
+    msg = H1() / H2() / Ralon() / Footer()
+    assert h.Message.from_bytes(bytes(msg), H1, Footer) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), H1, Footer) == msg
+
+    msg = H1() / H2() / H3() / Fuad() / F1()
+    assert h.Message.from_bytes(bytes(msg), H1, F1) == msg
+    assert h.Message.from_stream(as_reader(bytes(msg)), H1, F1) == msg

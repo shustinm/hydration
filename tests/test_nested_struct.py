@@ -1,6 +1,8 @@
 import pytest
 import hydration as h
 
+from .utils import as_reader
+
 
 class Time(h.Struct):
     time = h.UInt64(3)
@@ -20,6 +22,7 @@ class Ron(h.Struct):
 def test_nested():
     a = Ron()
     assert a.from_bytes(bytes(a)) == a
+    assert a.from_stream(as_reader(bytes(a))) == a
 
 
 class Card(h.Struct):

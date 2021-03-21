@@ -6,9 +6,9 @@ from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
 from typing import Callable, List, Iterable, Optional
 
-from .helpers import as_obj, assert_no_property_override, as_type
+from .helpers import as_obj, assert_no_property_override, as_type, as_stream
 from .scalars import Scalar, Enum
-from .fields import Field, VLA, FieldPlaceholder
+from .fields import Field, VLA
 from .endianness import Endianness
 
 illegal_field_names = ['value', 'validate', '_fields']
@@ -220,31 +220,7 @@ class Struct(metaclass=StructMeta):
         :return The deserialized struct
         """
 
-        obj = cls(*args)
-
-        for field_name in obj._field_names:
-
-            # Get field for current field name
-            field = getattr(obj, field_name)
-
-            obj.invoke_from_bytes_hooks(field)
-
-            # Bytes hooks can change the field object, so get it again by name
-            field = getattr(obj, field_name)
-
-            if isinstance(field, VLA):
-                field.length = int(getattr(obj, field.length_field_name))
-                field.from_bytes(data)
-                data = data[len(bytes(field)):]
-            else:
-                split_index = field.size
-
-                field_data, data = data[:split_index], data[split_index:]
-                field.value = field.from_bytes(field_data).value
-                with suppress(AttributeError):
-                    field.validator.validate(field.value)
-
-        return obj
+        return cls.from_stream(as_stream(data), *args)
 
     @classmethod
     def from_stream(cls, read_func: Callable[[int], bytes], *args):
@@ -260,19 +236,22 @@ class Struct(metaclass=StructMeta):
 
         obj = cls(*args)
 
-        for field in obj._fields:
+        for field_name in obj._field_names:
+
+            # Get field for current field name
+            field = getattr(obj, field_name)
 
             obj.invoke_from_bytes_hooks(field)
 
+            # Bytes hooks can change the field object, so get it again by name
+            field = getattr(obj, field_name)
+
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
-                data = read_func(field.length)
-                field.from_bytes(data)
+                field.from_stream(read_func)
             else:
-                read_size = field.size
+                field.from_stream(read_func)
 
-                data = read_func(read_size)
-                field.value = field.from_bytes(data).value
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 

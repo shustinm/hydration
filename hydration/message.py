@@ -1,9 +1,10 @@
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from typing import List, Union, Type, Mapping
+from typing import List, Union, Type, Mapping, Callable
+from bidict import bidict, ValueDuplicationError
 
-from hydration.helpers import as_obj
+from .helpers import as_obj, as_stream
 from .base import Struct
 from .fields import Field
 from .validators import ValidatorABC, as_validator
@@ -137,6 +138,68 @@ class Message:
     def __len__(self):
         return len(self.layers)
 
+    @classmethod
+    def from_bytes(cls, data: bytes, header_class: Type[Struct], *layers: Type[Struct]):
+        """
+        Create a message from bytes data, using a header with an OpcodeField.
+        
+        :param data: Data containing the message (in bytes)
+        :param header_class: The header class of the message
+        :param layers: The struct classes that represent the layers of the message
+        :return: A message created from `data`, based on `header_class` and `layers`
+        """
+
+        return cls.from_stream(as_stream(data), header_class, *layers)
+
+    @classmethod
+    def from_stream(cls, read_func: Callable[[int], bytes], header_class: Type[Struct], *layers: Type[Struct]):
+        """
+        Create a message from bytes data, using a header with an OpcodeField and the layers that represent the message.
+
+        :param read_func: The stream's reader function
+        The function needs to receive an int as a positional parameter and return a bytes object.
+        :param header_class: The header class of the message
+        :param layers: The struct classes that represent the layers of the message
+        :return: A message created from `read_func`, based on `header_class` and `layers`
+        """
+
+        # Find the opcode field in the header
+        for opcode_name, opcode_field in as_obj(header_class):
+            if isinstance(opcode_field, OpcodeField):
+                break
+        else:
+            raise AttributeError(f'Header {header_class.__name__} '
+                                 f'must have an opcode field in order to deserialize a message')
+
+        # Create the header object
+        header = header_class.from_stream(read_func)
+
+        # Extract body class from header's opcode field
+        header_opcode_value = getattr(header, opcode_name).value
+        body_class: Type[Struct] = bidict(opcode_field.opcode_dictionary).inverse[header_opcode_value]
+
+        # Create the body
+        try:
+            # Try to treat the body as a message in case it's also contains an OpcodeField
+            body = Message.from_stream(read_func, body_class)
+        except AttributeError:
+            # If it doesn't contain an OpcodeField treat it like a normal struct
+            body = body_class.from_stream(read_func)
+
+        additional_layers = []
+        for layer in layers:
+            try:
+                # Try to treat the body as a message in case it's also contains an OpcodeField
+                msg = cls.from_stream(read_func, layer)
+                additional_layers.extend(msg.layers)
+            except AttributeError:
+                # If it doesn't contain an OpcodeField treat it like a normal struct
+                obj = layer.from_stream(read_func)
+                additional_layers.append(obj)
+
+        print(*additional_layers)
+        return cls(header, body, *additional_layers, update_metadata=False)
+
     @property
     def size(self):
         # layers are structs or bytes, so use len instead of size
@@ -186,6 +249,9 @@ class MetaField(Field, ABC):
     def from_bytes(self, data: bytes):
         return self.data_field.from_bytes(data)
 
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        return self.data_field.from_stream(read_func)
+
     @abstractmethod
     def update(self, message: Message, struct: Struct, struct_index: int):
         raise NotImplementedError
@@ -206,6 +272,12 @@ class OpcodeField(MetaField):
     def __init__(self, data_field: FieldType, opcode_dictionary: Mapping):
         super().__init__(data_field)
         self.opcode_dictionary = opcode_dictionary
+
+        try:
+            # Validate that there are no duplicate opcodes
+            bidict(opcode_dictionary)
+        except ValueDuplicationError:
+            raise ValueError("Opcode values must be unique")
 
     def update(self, message: Message, struct: Struct, struct_index: int):
         with suppress(IndexError):

@@ -1,4 +1,5 @@
 import inspect
+from typing import Callable
 
 
 def as_type(obj):
@@ -7,6 +8,18 @@ def as_type(obj):
 
 def as_obj(obj):
     return obj if not inspect.isclass(obj) else obj()
+
+
+def as_stream(data: bytes) -> Callable[[int], bytes]:
+    class _StreamReader:
+        def __init__(self, _data: bytes):
+            self._data = _data
+
+        def read(self, size: int) -> bytes:
+            user_data, self._data = self._data[:size], self._data[size:]
+            return user_data
+
+    return _StreamReader(data).read
 
 
 def assert_no_property_override(obj, base_class):

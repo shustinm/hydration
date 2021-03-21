@@ -1,6 +1,8 @@
 import pytest
 import hydration as h
 
+from .utils import as_reader
+
 
 class Omri(h.Struct):
     a = h.UInt16(256)
@@ -75,6 +77,8 @@ def test_footer():
 
 
 def test_from_stream():
+    from .utils import MockReader
+
     class Shustin(h.Struct):
         length = h.UInt16()
         data = h.Vector(length=length, field_type=h.UInt8())
@@ -85,27 +89,21 @@ def test_from_stream():
         yazam = h.UInt32()
         bihlal = h.UInt64()
 
-    class MockReader:
-        def __init__(self, data: bytes):
-            self._data = data
-
-        def read(self, size=0):
-            user_data, self._data = self._data[:size], self._data[size:]
-            return user_data
-
     shustin = Shustin()
     shustin.length = 32
     shustin.data = [x for x in range(0, 32, 1)]
-    my_shustin = Shustin.from_stream(MockReader(bytes(shustin)).read)
-    assert bytes(shustin) == bytes(my_shustin)
+    my_shustin = Shustin.from_stream(as_reader(bytes(shustin)))
+    # assert bytes(shustin) == bytes(my_shustin)
+    assert shustin == my_shustin
 
     nadav = NadavLoYazam()
     nadav.nadav = 3
     nadav.lo = 854
     nadav.yazam = 1512
     nadav.bihlal = 38272
-    nadav_lo_yazam = NadavLoYazam.from_stream(MockReader(bytes(nadav)).read)
-    assert bytes(nadav) == bytes(nadav_lo_yazam)
+    nadav_lo_yazam = NadavLoYazam.from_stream(as_reader(bytes(nadav)))
+    # assert bytes(nadav) == bytes(nadav_lo_yazam)
+    assert nadav == nadav_lo_yazam
 
 
 def test_new_attributes():
@@ -135,6 +133,7 @@ def test_inherit_default_args():
 
     a = Amadeus(3)
     assert Amadeus(3).from_bytes(bytes(a)) == a
+    assert Amadeus(3).from_stream(as_reader(bytes(a))) == a
 
     class Mozart(Amadeus):
         y = h.UInt16
@@ -145,6 +144,7 @@ def test_inherit_default_args():
 
     m = Mozart(4, 5)
     assert Mozart(0, 0).from_bytes(bytes(m)) == m
+    assert Mozart(0, 0).from_stream(as_reader(bytes(m))) == m
 
 
 def test_from_bytes_hooks():
@@ -160,5 +160,7 @@ def test_from_bytes_hooks():
     r.arr.type = h.UInt16()
 
     r2 = Ronen.from_bytes(bytes(r))
+    r3 = Ronen.from_stream(as_reader(bytes(r)))
 
     assert r2.arr == list(range(10))
+    assert r3.arr == list(range(10))

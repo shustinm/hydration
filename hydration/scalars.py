@@ -122,10 +122,15 @@ class Scalar(Field, Real):
     def __float__(self) -> float:
         return float(self.value)
 
-    def from_bytes(self, data: bytes):
+    def from_stream(self, read_func: Callable[[int], bytes]):
         format_string = '{}{}'.format(self.endianness_format, self.scalar_format)
-        # noinspection PyAttributeOutsideInit
-        self.value = struct.unpack(format_string, data)[0]
+
+        try:
+            # noinspection PyAttributeOutsideInit
+            self.value = struct.unpack(format_string, read_func(len(self)))[0]
+        except struct.error:
+            raise ValueError(f'Not enough bytes to unpack {self.__class__.__name__}')
+
         return self
 
     def __trunc__(self):
@@ -316,6 +321,9 @@ class Enum(Field):
         self.type.from_bytes(data)
         self.value = self.type.value
         return self
+
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        return self.from_bytes(read_func(len(self)))
 
     @property
     def name(self):
