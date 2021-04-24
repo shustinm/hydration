@@ -165,11 +165,26 @@ class Struct(metaclass=StructMeta):
         self.__frozen = True
 
     def __str__(self):
+        from .vectors import Array
+
         x = [f'{self.__class__.__qualname__}:']
         for name, field in self:
-            if isinstance(field, Struct):
-                x.append('\t{} ({}):'.format(name, field.__class__.__qualname__))
-                x.extend('\t{}'.format(field_str) for field_str in str(field).splitlines()[1:])
+            if isinstance(field, (Struct, Array)):
+                # Get string representation of inner field
+                field_str_lines = str(field).splitlines()
+
+                # Check if inner field's representation is single-line
+                if len(field_str_lines) == 1:
+                    x.append('\t{}:\t{}'.format(name, field_str_lines[0]))
+                else:
+                    # Ignore first line of inner representation (the struct's name)
+                    field_str_lines = field_str_lines[1:]
+
+                    # Start multiline print
+                    x.append('\t{} ({}):'.format(name, field.__class__.__qualname__))
+
+                    # Add all inner fields indented
+                    x.extend('\t{}'.format(field_str) for field_str in field_str_lines)
             else:
                 x.append('\t{}:\t{}'.format(name, field))
         return '\n'.join(x)
