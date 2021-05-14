@@ -122,8 +122,16 @@ class Scalar(Field, Real):
     def __float__(self) -> float:
         return float(self.value)
 
+    def __get_format_string(self):
+        return '{}{}'.format(self.endianness_format, self.scalar_format)
+
+    def from_stream(self, reader):
+        format_string = self.__get_format_string()
+        data = reader(struct.calcsize(format_string))
+        return self.from_bytes(data)
+
     def from_bytes(self, data: bytes):
-        format_string = '{}{}'.format(self.endianness_format, self.scalar_format)
+        format_string = self.__get_format_string()
         # noinspection PyAttributeOutsideInit
         self.value = struct.unpack(format_string, data)[0]
         return self
@@ -311,6 +319,11 @@ class Enum(Field):
             return bytes(self.type)
         except ValueError as e:
             raise ValueError(f'Error serializing {repr(self)}:\n{str(e)}')
+    
+    def from_stream(self, reader):
+        self.type.from_stream(reader)
+        self.value = self.type.value
+        return self
 
     def from_bytes(self, data: bytes):
         self.type.from_bytes(data)

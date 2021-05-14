@@ -51,6 +51,10 @@ class Field(ABC):
     def from_bytes(self, data: bytes):
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def from_stream(self, reader):
+        raise NotImplementedError
+
     def __eq__(self, other):
         if isinstance(other, Field):
             return self.value == other.value and len(self) == len(other)
@@ -117,4 +121,7 @@ class FieldPlaceholder(Field):
         raise AttributeError('Placeholders cannot be serialized')
 
     def from_bytes(self, data: bytes):
+        raise AttributeError('Placeholders cannot be deserialized')
+
+    def from_stream(self, reader):
         raise AttributeError('Placeholders cannot be deserialized')

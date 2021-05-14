@@ -153,6 +153,9 @@ class Array(_Sequence):
     def size(self):
         return len(self) * len(self.type)
 
+    def from_stream(self, reader):
+        return self.from_bytes(reader(self.size))
+
 
 class Vector(_Sequence, VLA):
 
@@ -171,6 +174,17 @@ class Vector(_Sequence, VLA):
 
         # This assumes that the Struct will update the length field's value
         self.length = len(value)
+
+    def from_stream(self, reader):
+        if isinstance(self.type, Field):
+            return super().from_bytes(reader(len(self) * len(self.type)))
+        else:
+            val = []
+            for _ in range(len(self)):
+                next_obj = self.type.from_stream(reader)
+                val.append(next_obj)
+            self.value = val
+            return self
 
     def from_bytes(self, data: bytes):
         if isinstance(self.type, Field):

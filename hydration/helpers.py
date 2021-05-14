@@ -20,3 +20,14 @@ def assert_no_property_override(obj, base_class):
             if (isinstance(getattr(base_class, attr_name), property) and
                     not isinstance(getattr(type(obj), attr_name), property)):
                 raise NameError(f"'{attr_name}' is an invalid name for an attribute in a sequenced or nested struct")
+
+def as_stream(data: bytes):
+    class Reader:
+        def __init__(self, content: bytes):
+            self._data = content
+
+        def read(self, size=0):
+            user_data, self._data = self._data[:size], self._data[size:]
+            return user_data
+    
+    return Reader(data).read

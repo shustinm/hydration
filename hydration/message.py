@@ -182,6 +182,9 @@ class MetaField(Field, ABC):
 
     def __bytes__(self) -> bytes:
         return bytes(self.data_field)
+    
+    def from_stream(self, reader):
+        return self.data_field.from_stream(reader)
 
     def from_bytes(self, data: bytes):
         return self.data_field.from_bytes(data)
