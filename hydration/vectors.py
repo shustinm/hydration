@@ -1,7 +1,7 @@
 import copy
 from abc import ABC
 from collections import UserList
-from typing import Sequence, Optional, Any, Union, Iterable
+from typing import Sequence, Optional, Any, Union, Iterable, Callable
 from itertools import islice
 
 from .base import Struct
@@ -153,8 +153,8 @@ class Array(_Sequence):
     def size(self):
         return len(self) * len(self.type)
 
-    def from_stream(self, reader):
-        return self.from_bytes(reader(self.size))
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        return self.from_bytes(read_func(self.size))
 
 
 class Vector(_Sequence, VLA):
@@ -175,13 +175,13 @@ class Vector(_Sequence, VLA):
         # This assumes that the Struct will update the length field's value
         self.length = len(value)
 
-    def from_stream(self, reader):
+    def from_stream(self, read_func: Callable[[int], bytes]):
         if isinstance(self.type, Field):
-            return super().from_bytes(reader(len(self) * len(self.type)))
+            return super().from_bytes(read_func(len(self) * len(self.type)))
         else:
             val = []
             for _ in range(len(self)):
-                next_obj = self.type.from_stream(reader)
+                next_obj = self.type.from_stream(read_func)
                 val.append(next_obj)
             self.value = val
             return self

@@ -1,7 +1,7 @@
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from typing import List, Union, Type, Mapping
+from typing import List, Union, Type, Mapping, Callable
 
 from hydration.helpers import as_obj
 from .base import Struct
@@ -183,8 +183,8 @@ class MetaField(Field, ABC):
     def __bytes__(self) -> bytes:
         return bytes(self.data_field)
     
-    def from_stream(self, reader):
-        return self.data_field.from_stream(reader)
+    def from_stream(self, read_func: Callable[[int], bytes]):
+        return self.data_field.from_stream(read_func)
 
     def from_bytes(self, data: bytes):
         return self.data_field.from_bytes(data)
