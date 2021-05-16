@@ -122,16 +122,9 @@ class Scalar(Field, Real):
     def __float__(self) -> float:
         return float(self.value)
 
-    def __get_format_string(self):
-        return '{}{}'.format(self.endianness_format, self.scalar_format)
-
     def from_stream(self, read_func: Callable[[int], bytes]):
-        format_string = self.__get_format_string()
+        format_string = '{}{}'.format(self.endianness_format, self.scalar_format)
         data = read_func(struct.calcsize(format_string))
-        return self.from_bytes(data)
-
-    def from_bytes(self, data: bytes):
-        format_string = self.__get_format_string()
         # noinspection PyAttributeOutsideInit
         self.value = struct.unpack(format_string, data)[0]
         return self
@@ -322,11 +315,6 @@ class Enum(Field):
     
     def from_stream(self, read_func: Callable[[int], bytes]):
         self.type.from_stream(read_func)
-        self.value = self.type.value
-        return self
-
-    def from_bytes(self, data: bytes):
-        self.type.from_bytes(data)
         self.value = self.type.value
         return self
 

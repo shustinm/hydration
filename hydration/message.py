@@ -186,9 +186,6 @@ class MetaField(Field, ABC):
     def from_stream(self, read_func: Callable[[int], bytes]):
         return self.data_field.from_stream(read_func)
 
-    def from_bytes(self, data: bytes):
-        return self.data_field.from_bytes(data)
-
     @abstractmethod
     def update(self, message: Message, struct: Struct, struct_index: int):
         raise NotImplementedError

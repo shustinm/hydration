@@ -1,5 +1,6 @@
 import abc
 from abc import ABC
+from hydration.helpers import as_stream
 from typing import Union, Callable
 
 from .validators import ValidatorABC
@@ -47,9 +48,8 @@ class Field(ABC):
     def __bytes__(self) -> bytes:
         raise NotImplementedError
 
-    @abc.abstractmethod
     def from_bytes(self, data: bytes):
-        raise NotImplementedError
+        return self.from_stream(as_stream(data))
 
     @abc.abstractmethod
     def from_stream(self, read_func: Callable[[int], bytes]):
@@ -119,9 +119,6 @@ class FieldPlaceholder(Field):
 
     def __bytes__(self) -> bytes:
         raise AttributeError('Placeholders cannot be serialized')
-
-    def from_bytes(self, data: bytes):
-        raise AttributeError('Placeholders cannot be deserialized')
 
     def from_stream(self, read_func: Callable[[int], bytes]):
         raise AttributeError('Placeholders cannot be deserialized')

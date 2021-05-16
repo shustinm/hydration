@@ -186,18 +186,6 @@ class Vector(_Sequence, VLA):
             self.value = val
             return self
 
-    def from_bytes(self, data: bytes):
-        if isinstance(self.type, Field):
-            return super().from_bytes(data[:len(self) * len(self.type)])
-        else:
-            val = []
-            for _ in range(len(self)):
-                next_obj = self.type.from_bytes(data)
-                val.append(next_obj)
-                data = data[len(bytes(next_obj)):]
-            self.value = val
-            return self
-
     def __len__(self) -> int:
         return VLA.__len__(self)
 
