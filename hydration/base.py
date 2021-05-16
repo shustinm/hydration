@@ -6,7 +6,7 @@ from contextlib import suppress
 from pyhooks import Hook, precall_register, postcall_register
 from typing import Callable, List, Iterable, Optional
 
-from .helpers import as_obj, assert_no_property_override, as_type
+from .helpers import as_obj, assert_no_property_override, as_type, as_stream
 from .scalars import Scalar, Enum
 from .fields import Field, VLA, FieldPlaceholder
 from .endianness import Endianness
@@ -101,7 +101,7 @@ class StructMeta(type):
 class Struct(metaclass=StructMeta):
     __frozen = False
     _field_names: List[str]
-    _from_bytes_hooks = {}
+    _deserialization_hooks = {}
 
     @property
     def value(self):
@@ -144,7 +144,7 @@ class Struct(metaclass=StructMeta):
         self.from_bytes = lambda data: self._from_bytes(data, *args)
         self.from_stream = lambda data: self._from_stream(data, *args)
 
-        self._from_bytes_hooks = {}
+        self._deserialization_hooks = {}
 
         # Deepcopy the fields so different instances of Struct have unique fields
         for name, field in self:
@@ -207,8 +207,8 @@ class Struct(metaclass=StructMeta):
         except struct.error as e:
             raise ValueError(str(e)) from e
 
-    pre_bytes_hook = precall_register('__bytes__')
-    post_bytes_hook = postcall_register('__bytes__')
+    pre_serialization_hook = precall_register('__bytes__')
+    post_serialization_hook = postcall_register('__bytes__')
 
     @classmethod
     def from_bytes(cls, data: bytes, *args):
@@ -219,32 +219,7 @@ class Struct(metaclass=StructMeta):
         :param args: Arguments for the __init__ of the Struct, if there's any
         :return The deserialized struct
         """
-
-        obj = cls(*args)
-
-        for field_name in obj._field_names:
-
-            # Get field for current field name
-            field = getattr(obj, field_name)
-
-            obj.invoke_from_bytes_hooks(field)
-
-            # Bytes hooks can change the field object, so get it again by name
-            field = getattr(obj, field_name)
-
-            if isinstance(field, VLA):
-                field.length = int(getattr(obj, field.length_field_name))
-                field.from_bytes(data)
-                data = data[len(bytes(field)):]
-            else:
-                split_index = field.size
-
-                field_data, data = data[:split_index], data[split_index:]
-                field.value = field.from_bytes(field_data).value
-                with suppress(AttributeError):
-                    field.validator.validate(field.value)
-
-        return obj
+        return cls.from_stream(as_stream(data), *args)
 
     @classmethod
     def from_stream(cls, read_func: Callable[[int], bytes], *args):
@@ -260,19 +235,21 @@ class Struct(metaclass=StructMeta):
 
         obj = cls(*args)
 
-        for field in obj._fields:
+        for field_name in obj._field_names:
 
-            obj.invoke_from_bytes_hooks(field)
+            # Get field for current field name
+            field = getattr(obj, field_name)
+
+            obj.invoke_deserialization_hooks(field)
+
+            # Bytes hooks can change the field object, so get it again by name
+            field = getattr(obj, field_name)
 
             if isinstance(field, VLA):
                 field.length = int(getattr(obj, field.length_field_name))
-                data = read_func(field.length)
-                field.from_bytes(data)
+                field.from_stream(read_func)
             else:
-                read_size = field.size
-
-                data = read_func(read_size)
-                field.value = field.from_bytes(data).value
+                field.value = field.from_stream(read_func).value
                 with suppress(AttributeError):
                     field.validator.validate(field.value)
 
@@ -304,29 +281,33 @@ class Struct(metaclass=StructMeta):
         # Overriding fields but saving the hooks
         elif key in self._field_names:
             # Save the hooks from the field
-            hooks = getattr(getattr(self, key), '_from_bytes_hooks', [])
+            hooks = getattr(getattr(self, key), '_deserialization_hooks', [])
             # Set the field to the new value
             super().__setattr__(key, value)
             # Inject the old hooks to the new field
-            setattr(getattr(self, key), '_from_bytes_hooks', hooks)
+            setattr(getattr(self, key), '_deserialization_hooks', hooks)
         elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
         else:
             raise AttributeError("Struct doesn't allow defining new attributes")
 
-    def invoke_from_bytes_hooks(self, field: Field):
-        for f in getattr(field, '_from_bytes_hooks', ()):
+    def invoke_deserialization_hooks(self, field: Field):
+        for f in getattr(field, '_deserialization_hooks', ()):
             f(self)
-
+    
     @classmethod
     def from_bytes_hook(cls, field):
+        return cls.deserialization_hook(field)
+
+    @classmethod
+    def deserialization_hook(cls, field):
 
         # noinspection PyProtectedMember
         def register_field_hook(func: callable):
-            if hasattr(field, '_from_bytes_hooks'):
-                field._from_bytes_hooks.append(func)
+            if hasattr(field, '_deserialization_hooks'):
+                field._deserialization_hooks.append(func)
             else:
-                field._from_bytes_hooks = [func]
+                field._deserialization_hooks = [func]
             return func
 
         return register_field_hook
