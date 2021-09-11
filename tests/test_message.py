@@ -11,7 +11,7 @@ class Tomer(h.Struct):
 
 
 class Lior(h.Struct):
-    a = h.Array(5, fill=True)
+    a: h.UInt8[5] = {0}
 
 
 def test_message():

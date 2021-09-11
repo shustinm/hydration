@@ -45,6 +45,9 @@ class StructMeta(type):
         # Save field names as an attribute, used to iterate over the fields (in order)
         attributes['_field_names'] = []
 
+        annotations = attributes.get('__annotations__', {})
+        attributes['_post_construction_values'] = {}
+
         # Check if the metaclass is running for class Struct itself, in which case, it won't have any fields
         if not bases:
             return super().__new__(mcs, name, bases, attributes)
@@ -52,25 +55,29 @@ class StructMeta(type):
         # Some fields/api require extra logic, so it's executed here
         for field_name, field_obj in attributes.items():
 
+            # Check if the field is annotated
+            field_class = as_type(annotations.get(field_name, field_obj))
+
             # Ignore attributes that aren't hydra fields or structs
-            if not issubclass(as_type(field_obj), (Field, Struct)):
+            if not issubclass(field_class, (Field, Struct)):
                 continue
 
             # Convert to object (this is to support non-instantiated Structs
-            field_obj = as_obj(field_obj)
+            if field_name in annotations:
+                attributes['_post_construction_values'][field_name] = field_obj
+                field_obj = as_obj(annotations[field_name])
+            else:
+                field_obj = as_obj(field_obj)
+
             attributes['_field_names'].append(field_name)
             attributes[field_name] = field_obj
 
-            '''
-            Nested struct act as fields, so make sure the properties are not overridden
-            by fields with the same name
-            '''
+            # Nested struct act as fields, so make sure the properties are not overridden
+            # by fields with the same name
             if isinstance(field_obj, Struct):
                 assert_no_property_override(field_obj, Struct)
 
-            '''
-            VLA's length field name must be resolved (if not already given)
-            '''
+            # VLA's length field name must be resolved (if not already given)
             if isinstance(field_obj, VLA) and not field_obj.length_field_name:
                 # Look for the name of the field which has the VLA's length
                 field_obj.find_and_set_field_name(attributes)
@@ -152,9 +159,10 @@ class Struct(metaclass=StructMeta):
             with suppress(AttributeError):
                 field.validator.validate(field.value)
             setattr(self, name, copy.deepcopy(field))
-            # Initialize VLA length fields with proper values
-            if isinstance(field, VLA):
-                setattr(self, field.length_field_name, len(field))
+            # noinspection PyUnresolvedReferences
+            if name in self._post_construction_values:
+                # noinspection PyUnresolvedReferences
+                setattr(self, name, self._post_construction_values[name])
 
         for k, v in kwargs.items():
             if k not in self._field_names:
@@ -307,8 +315,13 @@ class Struct(metaclass=StructMeta):
             hooks = getattr(getattr(self, key), '_from_bytes_hooks', [])
             # Set the field to the new value
             super().__setattr__(key, value)
+            field = getattr(self, key)
             # Inject the old hooks to the new field
-            setattr(getattr(self, key), '_from_bytes_hooks', hooks)
+            field._from_bytes_hooks = hooks
+            if isinstance(field, VLA):
+                # Set VLA source to the new length
+                setattr(self, field.length_field_name, len(field))
+
         elif hasattr(self, key) or not self.__frozen:
             super().__setattr__(key, value)
         else:

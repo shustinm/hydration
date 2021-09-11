@@ -170,6 +170,10 @@ class Scalar(Field, Real):
     def __abs__(self):
         return abs(self.value)
 
+    def __class_getitem__(cls, item: int):
+        from .vectors import Array
+        return Array(item, cls)
+
 
 class _IntScalar(Scalar, Integral):
     def __lshift__(self, other):

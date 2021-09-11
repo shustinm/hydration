@@ -38,9 +38,7 @@ class _Sequence(UserList, Field, ABC):
 
     def __bytes__(self) -> bytes:
         if len(self.value) != len(self):
-            raise ValueError(f'Array value ({self.value}) does not match the provided length ({len(self)}). '
-                             f'Consider passing `fill=True` to the {self.__class__.__name__} constructor')
-
+            raise ValueError(f'Array value ({self.value}) does not match the provided length ({len(self)})')
         field_type = copy.deepcopy(self.type)
 
         result = bytearray()
@@ -114,12 +112,18 @@ class _Sequence(UserList, Field, ABC):
 class Array(_Sequence):
     def __init__(self, length: int,
                  field_type: FieldType = UInt8,
-                 value: Optional[Sequence[Any]] = (),
+                 value: Optional[Sequence[Any]] = None,
                  validator: Optional[ValidatorType] = None,
-                 fill: bool = False):
+                 fill: Optional[int] = None):
         self.length = length
-        self.fill = fill
-        super().__init__(field_type=field_type, value=value, validator=validator)
+        if value is not None and fill is not None:
+            raise ValueError(f"{self.__class__} only accepts value or fill, but not both")
+        # Old fill used to be bool. This would fill with zeros
+        if fill is True:
+            fill = {0}
+        elif isinstance(fill, int):
+            fill = {fill}
+        super().__init__(field_type=field_type, value=value or fill or [], validator=validator)
 
     def assert_value_not_too_long(self, value):
         """Make sure that the given value isn't too long"""
@@ -128,26 +132,18 @@ class Array(_Sequence):
                 len(self.data), len(self), len(value)
             ))
 
-    def fill_if_necessary(self):
-        """
-        Extend with the value of the default field value to fill the length (this tuple might be empty).
-        Will only fill if `self.fill` is `True`
-        """
-        if self.fill:
-            self.data.extend(self.type.value for _ in range(len(self) - len(self.data)))
-
     @_Sequence.value.setter
-    def value(self, value: Sequence[Any]):
-        self.assert_value_not_too_long(value)
-        self.data = list(value)
-        self.fill_if_necessary()
+    def value(self, value: Union[Sequence[Any], set]):
+        if isinstance(value, set):
+            if len(value) != 1:
+                raise ValueError(f'Expected a set with only 1 item. Got: {value}')
+            self.data = [next(iter(value))] * self.length
+        else:
+            self.assert_value_not_too_long(value)
+            self.data = list(value)
 
     def __len__(self) -> int:
         return self.length
-
-    def __delitem__(self, key) -> None:
-        super().__delitem__(key)
-        self.fill_if_necessary()
 
     @property
     def size(self):
