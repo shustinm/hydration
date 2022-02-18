@@ -56,6 +56,12 @@ class _Sequence(UserList, Field, ABC):
         return self
 
     def __str__(self):
+        if isinstance(self.type, Struct):
+            x = [f'{self.__class__.__qualname__}:', f'\ttype: {self.type.__class__.__qualname__}']
+            for index, field in enumerate(self.value):
+                x.append('\t{}:'.format(index))
+                x.extend('\t{}'.format(field_str) for field_str in str(field).splitlines()[1:])
+            return '\n'.join(x)
         return '{}{}'.format(self.__class__.__qualname__, self.value)
 
     def __repr__(self) -> str:
